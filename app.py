@@ -77,43 +77,55 @@ def inject_custom_css() -> None:
     st.markdown(
         """
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap');
+
         :root {
-            --ink: #08224a;
-            --muted: #54708f;
-            --line: rgba(22, 73, 122, 0.16);
-            --panel: rgba(255, 255, 255, 0.9);
-            --accent: #1ec7c0;
-            --accent-2: #0d5cab;
-            --accent-3: #10376f;
-            --glow: rgba(30, 199, 192, 0.22);
+            --ink: #0b2a4a;
+            --muted: #4d6781;
+            --line: rgba(11, 42, 74, 0.12);
+            --panel: rgba(255, 255, 255, 0.92);
+            --accent: #00c300;
+            --accent-2: #0a7b34;
+            --accent-3: #0b2a4a;
+            --glow: rgba(0, 195, 0, 0.16);
+            --sidebar-top: #0b2a4a;
+            --sidebar-bottom: #12406f;
+            --surface-soft: #f4faf2;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --ink: #ecf4ff;
-                --muted: #c1d2ea;
-                --line: rgba(124, 166, 214, 0.18);
-                --panel: rgba(12, 28, 52, 0.92);
-                --accent: #38d7d0;
-                --accent-2: #5ba2ff;
-                --accent-3: #d9ebff;
-                --glow: rgba(56, 215, 208, 0.18);
+                --ink: #edf7f0;
+                --muted: #bfd4c7;
+                --line: rgba(135, 192, 151, 0.18);
+                --panel: rgba(10, 27, 30, 0.94);
+                --accent: #36d44f;
+                --accent-2: #7de38d;
+                --accent-3: #edf7f0;
+                --glow: rgba(54, 212, 79, 0.18);
+                --sidebar-top: #071d31;
+                --sidebar-bottom: #0c3152;
+                --surface-soft: #0f1d1c;
             }
+        }
+
+        html, body, [class*="css"]  {
+            font-family: "Nunito Sans", "Segoe UI", Arial, sans-serif;
         }
 
         .stApp {
             background:
-                radial-gradient(circle at top left, rgba(30, 199, 192, 0.18), transparent 28%),
-                radial-gradient(circle at top right, rgba(13, 92, 171, 0.16), transparent 30%),
-                linear-gradient(180deg, #f4f8fd 0%, #edf4fb 100%);
+                radial-gradient(circle at top left, rgba(0, 195, 0, 0.13), transparent 26%),
+                radial-gradient(circle at top right, rgba(11, 42, 74, 0.09), transparent 30%),
+                linear-gradient(180deg, #f5fbf5 0%, #eef5f2 100%);
         }
 
         @media (prefers-color-scheme: dark) {
             .stApp {
                 background:
-                    radial-gradient(circle at top left, rgba(56, 215, 208, 0.14), transparent 28%),
-                    radial-gradient(circle at top right, rgba(91, 162, 255, 0.12), transparent 30%),
-                    linear-gradient(180deg, #07111f 0%, #0a172a 100%);
+                    radial-gradient(circle at top left, rgba(54, 212, 79, 0.12), transparent 28%),
+                    radial-gradient(circle at top right, rgba(125, 227, 141, 0.08), transparent 30%),
+                    linear-gradient(180deg, #061112 0%, #0c1718 100%);
             }
         }
 
@@ -124,7 +136,7 @@ def inject_custom_css() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #08224a 0%, #0d3569 100%);
+            background: linear-gradient(180deg, var(--sidebar-top) 0%, var(--sidebar-bottom) 100%);
             border-right: 1px solid rgba(255, 255, 255, 0.08);
         }
 
@@ -140,11 +152,11 @@ def inject_custom_css() -> None:
         }
 
         .hero-shell {
-            background: linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(245,251,255,0.92) 100%);
+            background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(244,250,242,0.96) 100%);
             border: 1px solid var(--line);
             border-radius: 26px;
             padding: 1.2rem 1.3rem 1.25rem 1.3rem;
-            box-shadow: 0 24px 80px rgba(8, 34, 74, 0.09);
+            box-shadow: 0 24px 80px rgba(11, 42, 74, 0.08);
             position: relative;
             overflow: hidden;
         }
@@ -156,7 +168,7 @@ def inject_custom_css() -> None:
             [data-testid="stMetric"],
             [data-testid="stExpander"],
             [data-testid="stHorizontalBlock"] > div > [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
-                background: linear-gradient(180deg, rgba(14, 30, 55, 0.96) 0%, rgba(10, 24, 44, 0.94) 100%) !important;
+                background: linear-gradient(180deg, rgba(10, 27, 30, 0.96) 0%, rgba(8, 20, 22, 0.95) 100%) !important;
                 border-color: var(--line) !important;
                 box-shadow: 0 18px 40px rgba(0, 0, 0, 0.26) !important;
             }
@@ -168,7 +180,7 @@ def inject_custom_css() -> None:
             inset: auto -80px -90px auto;
             width: 240px;
             height: 240px;
-            background: radial-gradient(circle, rgba(30, 199, 192, 0.24), transparent 65%);
+            background: radial-gradient(circle, rgba(0, 195, 0, 0.18), transparent 65%);
         }
 
         .hero-kicker {
@@ -180,8 +192,8 @@ def inject_custom_css() -> None:
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--accent-2);
-            background: rgba(13, 92, 171, 0.09);
-            border: 1px solid rgba(13, 92, 171, 0.15);
+            background: rgba(0, 195, 0, 0.08);
+            border: 1px solid rgba(0, 195, 0, 0.16);
             border-radius: 999px;
             padding: 0.45rem 0.8rem;
             width: fit-content;
@@ -213,8 +225,8 @@ def inject_custom_css() -> None:
         .flow-pill {
             border-radius: 999px;
             padding: 0.58rem 0.92rem;
-            background: rgba(13, 92, 171, 0.05);
-            border: 1px solid rgba(13, 92, 171, 0.1);
+            background: rgba(0, 195, 0, 0.07);
+            border: 1px solid rgba(0, 195, 0, 0.11);
             font-weight: 700;
             color: var(--ink);
             font-size: 0.92rem;
@@ -235,8 +247,8 @@ def inject_custom_css() -> None:
         }
 
         .status-chip.ready {
-            color: #0c6e67;
-            background: rgba(30, 199, 192, 0.16);
+            color: #0a7b34;
+            background: rgba(0, 195, 0, 0.14);
         }
 
         .status-chip.warn {
@@ -245,8 +257,8 @@ def inject_custom_css() -> None:
         }
 
         .status-chip.band {
-            color: #0d5cab;
-            background: rgba(13, 92, 171, 0.12);
+            color: #0b2a4a;
+            background: rgba(11, 42, 74, 0.1);
         }
 
         .command-card {
@@ -271,7 +283,7 @@ def inject_custom_css() -> None:
         }
 
         .agent-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(243,249,255,0.95) 100%);
+            background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(244,250,242,0.95) 100%);
             border: 1px solid var(--line);
             border-radius: 18px;
             padding: 0.9rem;
@@ -319,7 +331,7 @@ def inject_custom_css() -> None:
             align-items: center;
             justify-content: center;
             font-size: 1.4rem;
-            background: linear-gradient(135deg, rgba(13, 92, 171, 0.12), rgba(30, 199, 192, 0.16));
+            background: linear-gradient(135deg, rgba(11, 42, 74, 0.1), rgba(0, 195, 0, 0.16));
             color: var(--accent-3);
         }
 
@@ -366,8 +378,8 @@ def inject_custom_css() -> None:
         }
 
         .agent-badge.done {
-            background: rgba(13, 92, 171, 0.12);
-            color: #0d5cab;
+            background: rgba(0, 195, 0, 0.13);
+            color: #0a7b34;
         }
 
         .agent-badge.waiting {
@@ -407,8 +419,8 @@ def inject_custom_css() -> None:
         .kpi-pill {
             padding: 0.5rem 0.72rem;
             border-radius: 14px;
-            background: rgba(13, 92, 171, 0.07);
-            border: 1px solid rgba(13, 92, 171, 0.1);
+            background: rgba(0, 195, 0, 0.08);
+            border: 1px solid rgba(0, 195, 0, 0.11);
             margin-bottom: 0.6rem;
         }
 
@@ -425,8 +437,8 @@ def inject_custom_css() -> None:
 
         @media (prefers-color-scheme: dark) {
             .kpi-pill {
-                background: rgba(91, 162, 255, 0.12);
-                border-color: rgba(91, 162, 255, 0.18);
+                background: rgba(54, 212, 79, 0.12);
+                border-color: rgba(54, 212, 79, 0.16);
             }
 
             .kpi-pill span,
@@ -499,17 +511,17 @@ def inject_custom_css() -> None:
         }
 
         .stButton > button {
-            background: linear-gradient(90deg, #0d5cab 0%, #1ec7c0 100%);
+            background: linear-gradient(90deg, #0a7b34 0%, #00c300 100%);
             border: none;
             color: white;
             font-weight: 800;
             border-radius: 16px;
             padding: 0.85rem 1rem;
-            box-shadow: 0 14px 30px rgba(13, 92, 171, 0.28);
+            box-shadow: 0 14px 30px rgba(0, 195, 0, 0.24);
         }
 
         .stButton > button:hover {
-            background: linear-gradient(90deg, #094b8f 0%, #18b6b0 100%);
+            background: linear-gradient(90deg, #086129 0%, #00aa00 100%);
         }
         </style>
         """,
