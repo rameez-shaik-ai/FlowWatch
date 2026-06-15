@@ -413,6 +413,29 @@ def create_band_event(
     }
 
 
+def calculate_qoe_score(telemetry: dict[str, Any]) -> int:
+    score = 100.0
+
+    bitrate = float(telemetry["bitrate_mbps"])
+    buffering = float(telemetry["buffering_ratio"])
+    latency = float(telemetry["latency_ms"])
+    packet_loss = float(telemetry["packet_loss"])
+    crashes = int(telemetry["app_crashes"])
+
+    if bitrate < 8:
+        score -= (8 - bitrate) * 4.5
+    if buffering > 1:
+        score -= min(buffering - 1, 12) * 4.8
+    if latency > 40:
+        score -= min((latency - 40) / 12, 20)
+    if packet_loss > 0.5:
+        score -= min((packet_loss - 0.5) * 10, 24)
+    if crashes > 0:
+        score -= min(crashes * 18, 36)
+
+    return max(0, min(100, round(score)))
+
+
 def build_band_config() -> BandConfig:
     participants: list[BandParticipant] = []
 
@@ -840,14 +863,28 @@ def main() -> None:
                 value=int(telemetry_defaults["app_crashes"]),
                 step=1,
             ),
-            "qoe_score": st.number_input(
+        }
+
+        if st.session_state.telemetry_source_mode == "Manual":
+            telemetry["qoe_score"] = calculate_qoe_score(telemetry)
+            st.number_input(
+                "QoE score",
+                min_value=0,
+                max_value=100,
+                value=int(telemetry["qoe_score"]),
+                step=1,
+                disabled=True,
+                help="Calculated automatically from bitrate, buffering, latency, packet loss, and app crashes.",
+            )
+        else:
+            telemetry["qoe_score"] = st.number_input(
                 "QoE score",
                 min_value=0,
                 max_value=100,
                 value=int(telemetry_defaults["qoe_score"]),
                 step=1,
-            ),
-        }
+                help="Provided by the live telemetry source.",
+            )
         st.session_state.telemetry_values = telemetry.copy()
 
     render_hero(band_config)
