@@ -39,6 +39,7 @@ MODEL_OPTIONS = [
     "google/gemma-3-4b-it",
 ]
 DEFAULT_BAND_REST_URL = "https://app.band.ai"
+ARCHITECTURE_DIAGRAM_PATH = "assets/flowwatch-architecture.png"
 
 DEFAULT_TELEMETRY = {
     "customer_id": "CUST_1001",
@@ -337,6 +338,27 @@ def render_overview_cards() -> None:
             """,
             unsafe_allow_html=True,
         )
+
+
+def render_architecture_diagram() -> None:
+    with st.container(border=True):
+        st.markdown(
+            '<div class="section-title">Technical Architecture</div>',
+            unsafe_allow_html=True,
+        )
+        st.write(
+            "This architecture view now sits inside the product demo so you can explain "
+            "telemetry ingestion, agent orchestration, Band collaboration, and outputs "
+            "without leaving the app."
+        )
+        if os.path.exists(ARCHITECTURE_DIAGRAM_PATH):
+            st.image(
+                ARCHITECTURE_DIAGRAM_PATH,
+                caption="FlowWatch technical architecture for the hackathon demo",
+                use_container_width=True,
+            )
+        else:
+            st.info("Architecture diagram asset not found.")
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -934,6 +956,8 @@ def main() -> None:
 
     with st.expander("Raw telemetry JSON"):
         st.json(telemetry)
+
+    render_architecture_diagram()
 
     readiness_col, band_col = st.columns([1.15, 0.85], gap="large")
     with readiness_col:
