@@ -237,12 +237,6 @@ def inject_custom_css() -> None:
             font-size: 0.94rem;
         }
 
-        .agent-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1rem;
-        }
-
         .agent-card {
             background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(243,249,255,0.95) 100%);
             border: 1px solid var(--line);
@@ -251,6 +245,7 @@ def inject_custom_css() -> None:
             box-shadow: 0 18px 40px rgba(8, 34, 74, 0.06);
             position: relative;
             overflow: hidden;
+            min-height: 152px;
         }
 
         .agent-card::before {
@@ -365,39 +360,12 @@ def inject_custom_css() -> None:
             background: #aab8c6;
         }
 
-        .orchestration-shell {
-            background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(245,250,255,0.98) 100%);
-            border: 1px solid var(--line);
-            border-radius: 24px;
-            padding: 1rem 1.1rem 1.15rem 1.1rem;
-            box-shadow: 0 18px 42px rgba(8, 34, 74, 0.06);
-        }
-
-        .orchestration-top {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 0.8rem;
-            margin-bottom: 0.9rem;
-        }
-
-        .orchestration-copy {
-            color: var(--muted);
-            margin: 0;
-            max-width: 42rem;
-        }
-
-        .kpi-strip {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.7rem;
-        }
-
         .kpi-pill {
             padding: 0.58rem 0.8rem;
             border-radius: 16px;
             background: rgba(13, 92, 171, 0.07);
             border: 1px solid rgba(13, 92, 171, 0.1);
+            margin-bottom: 0.6rem;
         }
 
         .kpi-pill strong {
@@ -408,7 +376,7 @@ def inject_custom_css() -> None:
 
         .kpi-pill span {
             font-size: 0.8rem;
-            color: var(--muted);
+            color: #3f5e82;
         }
 
         @keyframes agentPulse {
@@ -435,6 +403,10 @@ def inject_custom_css() -> None:
             font-weight: 700;
         }
 
+        [data-testid="stMetricValue"] {
+            color: var(--ink);
+        }
+
         .section-title {
             font-size: 1.2rem;
             font-weight: 800;
@@ -456,17 +428,6 @@ def inject_custom_css() -> None:
             background: linear-gradient(90deg, #094b8f 0%, #18b6b0 100%);
         }
 
-        @media (max-width: 980px) {
-            .agent-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 640px) {
-            .agent-grid {
-                grid-template-columns: 1fr;
-            }
-        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -571,59 +532,61 @@ def render_agent_orchestration_board(
         ("Customer Care Agent", "Prepare outreach", "💬"),
     ]
     remote_count = len(band_config.participants) + (1 if band_config.agent_id else 0)
-    html_cards: list[str] = []
-    for name, role, icon in agent_specs:
-        state = agent_states.get(name, "waiting")
-        label = {
-            "active": "Running",
-            "done": "Complete",
-            "waiting": "Standby",
-        }.get(state, "Standby")
-        html_cards.append(
-            f"""
-            <div class="agent-card {state}">
-                <div class="agent-head">
-                    <div style="display:flex; gap:0.8rem; align-items:center;">
-                        <div class="agent-icon">{icon}</div>
-                        <div class="agent-state">
-                            <p class="agent-name">{name}</p>
-                            <p class="agent-role">{role}</p>
+    with st.container(border=True):
+        header_col, kpi_col = st.columns([1.8, 1.2], gap="large")
+        with header_col:
+            st.markdown(
+                '<div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>',
+                unsafe_allow_html=True,
+            )
+            st.write(
+                "This board shows how many agents are available for the demo and which specialist "
+                "is actively processing the case right now. Active agents pulse while their step runs."
+            )
+        with kpi_col:
+            st.markdown(
+                f'<div class="kpi-pill"><strong>4</strong><span>Core FlowWatch agents</span></div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<div class="kpi-pill"><strong>{remote_count}</strong><span>Band-connected agents</span></div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<div class="kpi-pill"><strong>{sum(1 for value in agent_states.values() if value == "done")}</strong><span>Completed steps</span></div>',
+                unsafe_allow_html=True,
+            )
+
+        columns = st.columns(4, gap="large")
+        for column, (name, role, icon) in zip(columns, agent_specs):
+            state = agent_states.get(name, "waiting")
+            label = {
+                "active": "Running",
+                "done": "Complete",
+                "waiting": "Standby",
+            }.get(state, "Standby")
+            with column:
+                st.markdown(
+                    f"""
+                    <div class="agent-card {state}">
+                        <div class="agent-head">
+                            <div style="display:flex; gap:0.8rem; align-items:center;">
+                                <div class="agent-icon">{icon}</div>
+                                <div class="agent-state">
+                                    <p class="agent-name">{name}</p>
+                                    <p class="agent-role">{role}</p>
+                                </div>
+                            </div>
+                            <span class="agent-badge {state}">{label}</span>
+                        </div>
+                        <div class="agent-meta">
+                            <span style="font-size:0.82rem; color:#3f5e82;">Core specialist</span>
+                            <span class="agent-led {state}"></span>
                         </div>
                     </div>
-                    <span class="agent-badge {state}">{label}</span>
-                </div>
-                <div class="agent-meta">
-                    <span style="font-size:0.82rem; color:var(--muted);">Core specialist</span>
-                    <span class="agent-led {state}"></span>
-                </div>
-            </div>
-            """
-        )
-
-    st.markdown(
-        f"""
-        <div class="orchestration-shell">
-            <div class="orchestration-top">
-                <div>
-                    <div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>
-                    <p class="orchestration-copy">
-                        This board shows how many agents are available for the demo and which specialist
-                        is actively processing the case right now. Active agents pulse while their step runs.
-                    </p>
-                </div>
-                <div class="kpi-strip">
-                    <div class="kpi-pill"><strong>4</strong><span>Core FlowWatch agents</span></div>
-                    <div class="kpi-pill"><strong>{remote_count}</strong><span>Band-connected agents</span></div>
-                    <div class="kpi-pill"><strong>{sum(1 for value in agent_states.values() if value == 'done')}</strong><span>Completed steps</span></div>
-                </div>
-            </div>
-            <div class="agent-grid">
-                {''.join(html_cards)}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
