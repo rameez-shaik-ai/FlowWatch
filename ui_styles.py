@@ -208,6 +208,14 @@ html, body, [class*="css"] {
     font-size: 0.92rem;
 }
 
+[data-testid="stHorizontalBlock"] {
+    align-items: stretch;
+}
+
+[data-testid="column"] > div {
+    height: 100%;
+}
+
 .agent-card {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -216,7 +224,7 @@ html, body, [class*="css"] {
     box-shadow: 0 12px 34px rgba(30, 43, 34, 0.05);
     position: relative;
     overflow: hidden;
-    min-height: 158px;
+    min-height: 178px;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -270,7 +278,7 @@ html, body, [class*="css"] {
 }
 
 .agent-name {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 800;
     color: var(--ink);
     margin: 0;
@@ -280,21 +288,22 @@ html, body, [class*="css"] {
 .agent-role {
     margin: 0.14rem 0 0 0;
     color: var(--muted);
-    font-size: 0.74rem;
+    font-size: 0.72rem;
     line-height: 1.25;
 }
 
 .agent-message {
     color: var(--muted);
-    font-size: 0.7rem;
-    line-height: 1.38;
-    margin-top: 0.3rem;
-    min-height: 2rem;
-    max-height: 2.9rem;
+    font-size: 0.68rem;
+    line-height: 1.34;
+    margin-top: 0.28rem;
+    min-height: 2.7rem;
+    max-height: 2.7rem;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    text-wrap: balance;
 }
 
 .agent-badge {
@@ -355,6 +364,10 @@ html, body, [class*="css"] {
     background: rgba(60, 197, 43, 0.08);
     border: 1px solid rgba(60, 197, 43, 0.12);
     margin-bottom: 0.6rem;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .kpi-pill strong {
@@ -385,15 +398,30 @@ html, body, [class*="css"] {
     border-radius: 18px;
     padding: 0.66rem 0.9rem;
     box-shadow: 0 10px 28px rgba(22, 50, 79, 0.04);
+    min-height: 146px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
 }
 
 [data-testid="stMetricLabel"] {
     color: var(--muted);
     font-weight: 700;
+    min-height: 2.3rem;
 }
 
 [data-testid="stMetricValue"] {
     color: var(--ink);
+    font-size: 2.2rem;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-testid="stMetricDelta"] {
+    min-height: 1.35rem;
 }
 
 .section-title {

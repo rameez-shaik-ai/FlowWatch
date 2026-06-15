@@ -158,29 +158,28 @@ def render_agent_orchestration_board(
     ]
     remote_count = len(band_config.participants) + (1 if band_config.agent_id else 0)
     with st.container(border=True):
-        header_col, kpi_col = st.columns([1.8, 1.2], gap="large")
-        with header_col:
-            st.markdown(
-                '<div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="compact-note">Compact live agent cards show who is active right now and the latest handoff message for each specialist.</div>',
-                unsafe_allow_html=True,
-            )
-        with kpi_col:
-            st.markdown(
-                f'<div class="kpi-pill"><strong>4</strong><span>Core FlowWatch agents</span></div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="kpi-pill"><strong>{remote_count}</strong><span>Band-connected agents</span></div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="kpi-pill"><strong>{sum(1 for value in agent_states.values() if value == "done")}</strong><span>Completed steps</span></div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            '<div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="compact-note">Compact live agent cards show who is active right now and the latest handoff message for each specialist.</div>',
+            unsafe_allow_html=True,
+        )
+
+        kpi_cols = st.columns(3, gap="medium")
+        kpi_cols[0].markdown(
+            '<div class="kpi-pill"><strong>4</strong><span>Core FlowWatch agents</span></div>',
+            unsafe_allow_html=True,
+        )
+        kpi_cols[1].markdown(
+            f'<div class="kpi-pill"><strong>{remote_count}</strong><span>Band-connected agents</span></div>',
+            unsafe_allow_html=True,
+        )
+        kpi_cols[2].markdown(
+            f'<div class="kpi-pill"><strong>{sum(1 for value in agent_states.values() if value == "done")}</strong><span>Completed steps</span></div>',
+            unsafe_allow_html=True,
+        )
 
         columns = st.columns(4, gap="medium")
         for column, (name, role, icon) in zip(columns, agent_specs):
@@ -856,6 +855,33 @@ def main() -> None:
     render_overview_cards()
     st.write("")
 
+    readiness_col, band_col = st.columns([1.15, 0.85], gap="large")
+    with readiness_col:
+        with st.container(border=True):
+            st.markdown('<div class="section-title">Workflow Control</div>', unsafe_allow_html=True)
+            st.write(
+                "Run the full pipeline below. FlowWatch first applies deterministic QoE rules, "
+                "then escalates to AI-powered diagnosis, recovery, and communication only when "
+                "customer impact is likely."
+            )
+    with band_col:
+        with st.container(border=True):
+            st.markdown('<div class="section-title">Band Mode</div>', unsafe_allow_html=True)
+            if band_config.enabled and BAND_SDK_AVAILABLE and band_config.api_key:
+                st.success("Band live room publishing is armed for this run.")
+            elif band_config.enabled and not BAND_SDK_AVAILABLE:
+                st.warning("Band publishing is enabled, but the SDK package is not available in this runtime.")
+            elif band_config.enabled and not band_config.api_key:
+                st.warning("Band publishing is enabled, but BAND_API_KEY is missing.")
+            else:
+                st.info("Band sync is optional. Enable it in the sidebar to publish the workflow into a real Band room.")
+
+    run_clicked = st.button(
+        "🚀 Run FlowWatch Multi-Agent Analysis",
+        type="primary",
+        use_container_width=True,
+    )
+
     default_agent_states = {
         "QoE Monitoring Agent": "waiting",
         "Diagnosis Agent": "waiting",
@@ -890,32 +916,7 @@ def main() -> None:
     with st.expander("Raw telemetry JSON"):
         st.json(telemetry)
 
-    readiness_col, band_col = st.columns([1.15, 0.85], gap="large")
-    with readiness_col:
-        with st.container(border=True):
-            st.markdown('<div class="section-title">Workflow Control</div>', unsafe_allow_html=True)
-            st.write(
-                "Run the full pipeline below. FlowWatch first applies deterministic QoE rules, "
-                "then escalates to AI-powered diagnosis, recovery, and communication only when "
-                "customer impact is likely."
-            )
-    with band_col:
-        with st.container(border=True):
-            st.markdown('<div class="section-title">Band Mode</div>', unsafe_allow_html=True)
-            if band_config.enabled and BAND_SDK_AVAILABLE and band_config.api_key:
-                st.success("Band live room publishing is armed for this run.")
-            elif band_config.enabled and not BAND_SDK_AVAILABLE:
-                st.warning("Band publishing is enabled, but the SDK package is not available in this runtime.")
-            elif band_config.enabled and not band_config.api_key:
-                st.warning("Band publishing is enabled, but BAND_API_KEY is missing.")
-            else:
-                st.info("Band sync is optional. Enable it in the sidebar to publish the workflow into a real Band room.")
-
-    if st.button(
-        "🚀 Run FlowWatch Multi-Agent Analysis",
-        type="primary",
-        use_container_width=True,
-    ):
+    if run_clicked:
         room_id = f"band-room-{telemetry['customer_id'].lower()}"
         communication_log: list[dict[str, Any]] = []
         band_result: dict[str, Any] | None = None
