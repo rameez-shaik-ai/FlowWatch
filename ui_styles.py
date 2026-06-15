@@ -452,6 +452,23 @@ html, body, [class*="css"] {
     background: linear-gradient(90deg, #258c25 0%, #47c92a 100%);
 }
 
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #eef7f0;
+    border-radius: 14px;
+    padding: 0.55rem 0.65rem;
+    box-shadow: none;
+    font-size: 0.86rem;
+    min-height: 2.6rem;
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
 @media (prefers-color-scheme: dark) {
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, var(--sidebar-top) 0%, var(--sidebar-bottom) 100%);
@@ -476,6 +493,18 @@ html, body, [class*="css"] {
     [data-testid="stSidebar"] textarea {
         background: rgba(9, 22, 24, 0.88);
         color: #eef7f0;
+    }
+
+    [data-testid="stSidebar"] .stButton > button {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #eef7f0;
+    }
+
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
     }
 
     .hero-shell,

@@ -459,10 +459,10 @@ def generate_ideal_telemetry() -> dict[str, Any]:
         "customer_id": f"CUST_{random.randint(100, 999)}",
         "device_id": f"STB_{random.randint(100, 999)}",
         "service": "TV streaming",
-        "bitrate_mbps": 8.5,
-        "buffering_ratio": 0.2,
-        "latency_ms": 28,
-        "packet_loss": 0.1,
+        "bitrate_mbps": 9.2,
+        "buffering_ratio": 0.0,
+        "latency_ms": 22,
+        "packet_loss": 0.0,
         "app_crashes": 0,
     }
     telemetry["qoe_score"] = calculate_qoe_score(telemetry)
@@ -845,11 +845,11 @@ def main() -> None:
         if st.session_state.telemetry_source_mode == "Manual":
             random_col, ideal_col = st.columns(2, gap="small")
             with random_col:
-                if st.button("Random dataset", use_container_width=True):
+                if st.button("Random", use_container_width=True):
                     st.session_state.telemetry_values = generate_random_telemetry()
                     st.rerun()
             with ideal_col:
-                if st.button("Ideal values", use_container_width=True):
+                if st.button("Ideal", use_container_width=True):
                     st.session_state.telemetry_values = generate_ideal_telemetry()
                     st.rerun()
 
