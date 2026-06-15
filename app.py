@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import random
 import time
 from dataclasses import dataclass
 from textwrap import dedent
@@ -436,6 +437,38 @@ def calculate_qoe_score(telemetry: dict[str, Any]) -> int:
     return max(0, min(100, round(score)))
 
 
+def generate_random_telemetry() -> dict[str, Any]:
+    telemetry = {
+        "customer_id": f"CUST_{random.randint(100, 999)}",
+        "device_id": f"STB_{random.randint(100, 999)}",
+        "service": random.choice(
+            ["TV streaming", "Live sports stream", "Movie playback", "Kids channel"]
+        ),
+        "bitrate_mbps": round(random.uniform(0.8, 9.5), 1),
+        "buffering_ratio": round(random.uniform(0.0, 9.5), 1),
+        "latency_ms": random.randint(20, 260),
+        "packet_loss": round(random.uniform(0.0, 4.5), 1),
+        "app_crashes": random.randint(0, 2),
+    }
+    telemetry["qoe_score"] = calculate_qoe_score(telemetry)
+    return telemetry
+
+
+def generate_ideal_telemetry() -> dict[str, Any]:
+    telemetry = {
+        "customer_id": f"CUST_{random.randint(100, 999)}",
+        "device_id": f"STB_{random.randint(100, 999)}",
+        "service": "TV streaming",
+        "bitrate_mbps": 8.5,
+        "buffering_ratio": 0.2,
+        "latency_ms": 28,
+        "packet_loss": 0.1,
+        "app_crashes": 0,
+    }
+    telemetry["qoe_score"] = calculate_qoe_score(telemetry)
+    return telemetry
+
+
 def build_band_config() -> BandConfig:
     participants: list[BandParticipant] = []
 
@@ -808,6 +841,17 @@ def main() -> None:
             ["Manual", "Live API fetch"],
             index=0 if st.session_state.telemetry_source_mode == "Manual" else 1,
         )
+
+        if st.session_state.telemetry_source_mode == "Manual":
+            random_col, ideal_col = st.columns(2, gap="small")
+            with random_col:
+                if st.button("Random dataset", use_container_width=True):
+                    st.session_state.telemetry_values = generate_random_telemetry()
+                    st.rerun()
+            with ideal_col:
+                if st.button("Ideal values", use_container_width=True):
+                    st.session_state.telemetry_values = generate_ideal_telemetry()
+                    st.rerun()
 
         if st.session_state.telemetry_source_mode == "Live API fetch":
             live_endpoint = st.text_input(
