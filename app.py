@@ -32,6 +32,24 @@ DEFAULT_TELEMETRY = {
 }
 
 
+def create_band_event(
+    step: int,
+    sender: str,
+    receiver: str,
+    event_type: str,
+    summary: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "step": step,
+        "sender": sender,
+        "receiver": receiver,
+        "event_type": event_type,
+        "summary": summary,
+        "payload": payload,
+    }
+
+
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
     qoe_score = float(telemetry["qoe_score"])
     evidence: list[str] = []
@@ -215,6 +233,38 @@ def render_agent_box(title: str, content: Any, is_json: bool = False) -> None:
             st.markdown(content)
 
 
+def render_band_room(
+    room_id: str,
+    shared_context: dict[str, Any],
+    communication_log: list[dict[str, Any]],
+) -> None:
+    with st.container(border=True):
+        st.subheader("Band Room Communication Layer")
+        st.write(
+            "FlowWatch uses Band as the agent communication layer: each specialist agent "
+            "publishes updates into a shared room, reads prior context, and hands the task "
+            "to the next agent with structured payloads."
+        )
+        st.caption(f"Band room: `{room_id}`")
+
+        room_col, log_col = st.columns([1, 1.35], gap="large")
+
+        with room_col:
+            st.markdown("**Shared room context**")
+            st.json(shared_context)
+
+        with log_col:
+            st.markdown("**Agent handoff trace**")
+            for event in communication_log:
+                with st.container(border=True):
+                    st.markdown(
+                        f"**Step {event['step']} · {event['sender']} -> {event['receiver']}**"
+                    )
+                    st.caption(f"{event['event_type']} | {event['summary']}")
+                    with st.expander("Band payload"):
+                        st.json(event["payload"])
+
+
 def render_hackathon_alignment() -> None:
     st.subheader("Hackathon Alignment")
     alignment_rows = [
@@ -224,7 +274,7 @@ def render_hackathon_alignment() -> None:
         },
         {
             "Hackathon Area": "Band usage",
-            "How FlowWatch addresses it": "Band is positioned as the shared collaboration layer for agent context, handoff, and room-based coordination.",
+            "How FlowWatch addresses it": "Band is showcased as the communication layer where agents share room context, publish handoffs, and coordinate next actions.",
         },
         {
             "Hackathon Area": "AI/ML API usage",
@@ -319,16 +369,42 @@ def main() -> None:
     with st.container(border=True):
         st.subheader("Band Collaboration Context")
         st.write(
-            "Band is used to demonstrate agent collaboration, shared context, and task "
-            "handoff in a Band room. This Streamlit app provides the stable product demo "
-            "powered by AI/ML API."
+            "Band is the communication layer in the FlowWatch story. Agents publish room "
+            "messages, share context, and hand off tasks through a Band room, while this "
+            "Streamlit app provides the stable product demo powered by AI/ML API."
         )
 
-    if st.button("🚀 Run FlowWatch Multi-Agent Analysis", type="primary", use_container_width=True):
+    if st.button(
+        "🚀 Run FlowWatch Multi-Agent Analysis",
+        type="primary",
+        use_container_width=True,
+    ):
+        room_id = f"band-room-{telemetry['customer_id'].lower()}"
+        communication_log: list[dict[str, Any]] = []
+
         qoe_result = qoe_monitoring_agent(telemetry)
+        communication_log.append(
+            create_band_event(
+                step=1,
+                sender="QoE Monitoring Agent",
+                receiver=qoe_result["recommended_next_agent"],
+                event_type="room_publish",
+                summary=f"Classified session as {qoe_result['qoe_status']}.",
+                payload=qoe_result,
+            )
+        )
         render_agent_box("1. QoE Monitoring Agent", qoe_result, is_json=True)
 
         if qoe_result["qoe_status"] == "Good":
+            shared_context = {
+                "room_status": "Monitoring complete",
+                "customer_id": telemetry["customer_id"],
+                "service": telemetry["service"],
+                "active_agents": ["QoE Monitoring Agent"],
+                "latest_status": qoe_result["qoe_status"],
+                "next_action": "Continue passive monitoring",
+            }
+            render_band_room(room_id, shared_context, communication_log)
             st.success(
                 "QoE looks healthy. FlowWatch stopped after monitoring because no further action is required."
             )
@@ -337,16 +413,75 @@ def main() -> None:
 
         with st.spinner("Running diagnosis, recovery, and customer care agents..."):
             diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
+            communication_log.append(
+                create_band_event(
+                    step=2,
+                    sender="Diagnosis Agent",
+                    receiver="Recovery Action Agent",
+                    event_type="handoff",
+                    summary="Published root cause assessment to the shared Band room.",
+                    payload={
+                        "diagnosis_summary": diagnosis_text,
+                        "customer_id": telemetry["customer_id"],
+                        "qoe_status": qoe_result["qoe_status"],
+                    },
+                )
+            )
             recovery_text = recovery_action_agent(
                 telemetry, diagnosis_text, selected_model
             )
+            communication_log.append(
+                create_band_event(
+                    step=3,
+                    sender="Recovery Action Agent",
+                    receiver="Customer Care Agent",
+                    event_type="handoff",
+                    summary="Shared recommended safe actions and monitoring plan.",
+                    payload={
+                        "recovery_plan": recovery_text,
+                        "selected_model": selected_model,
+                        "customer_id": telemetry["customer_id"],
+                    },
+                )
+            )
             customer_care_text = customer_care_agent(
                 telemetry, diagnosis_text, recovery_text, selected_model
+            )
+            communication_log.append(
+                create_band_event(
+                    step=4,
+                    sender="Customer Care Agent",
+                    receiver="Support Operations",
+                    event_type="room_publish",
+                    summary="Published customer communication and support summary.",
+                    payload={
+                        "customer_care_output": customer_care_text,
+                        "device_id": telemetry["device_id"],
+                        "service": telemetry["service"],
+                    },
+                )
             )
 
         render_agent_box("2. Diagnosis Agent", diagnosis_text)
         render_agent_box("3. Recovery Action Agent", recovery_text)
         render_agent_box("4. Customer Care Agent", customer_care_text)
+
+        shared_context = {
+            "room_status": "Escalation coordinated",
+            "customer_id": telemetry["customer_id"],
+            "device_id": telemetry["device_id"],
+            "service": telemetry["service"],
+            "active_agents": [
+                "QoE Monitoring Agent",
+                "Diagnosis Agent",
+                "Recovery Action Agent",
+                "Customer Care Agent",
+            ],
+            "latest_status": qoe_result["qoe_status"],
+            "selected_model": selected_model,
+            "next_action": "Proactive outreach and continued monitoring",
+        }
+        render_band_room(room_id, shared_context, communication_log)
         render_hackathon_alignment()
         st.success("FlowWatch analysis complete. The multi-agent workflow is ready for demo.")
 
