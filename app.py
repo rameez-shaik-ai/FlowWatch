@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
@@ -79,19 +80,21 @@ def inject_custom_css() -> None:
         """
         <style>
         :root {
-            --ink: #0f172a;
-            --muted: #516078;
-            --line: rgba(26, 39, 67, 0.12);
-            --panel: rgba(255, 255, 255, 0.84);
-            --accent: #ff7a18;
-            --accent-2: #0f9bd7;
+            --ink: #08224a;
+            --muted: #54708f;
+            --line: rgba(22, 73, 122, 0.16);
+            --panel: rgba(255, 255, 255, 0.9);
+            --accent: #1ec7c0;
+            --accent-2: #0d5cab;
+            --accent-3: #10376f;
+            --glow: rgba(30, 199, 192, 0.22);
         }
 
         .stApp {
             background:
-                radial-gradient(circle at top left, rgba(255, 122, 24, 0.18), transparent 26%),
-                radial-gradient(circle at top right, rgba(15, 155, 215, 0.16), transparent 28%),
-                linear-gradient(180deg, #f4f7fb 0%, #eef3f8 100%);
+                radial-gradient(circle at top left, rgba(30, 199, 192, 0.18), transparent 28%),
+                radial-gradient(circle at top right, rgba(13, 92, 171, 0.16), transparent 30%),
+                linear-gradient(180deg, #f4f8fd 0%, #edf4fb 100%);
         }
 
         .block-container {
@@ -101,7 +104,7 @@ def inject_custom_css() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #10233b 0%, #132b49 100%);
+            background: linear-gradient(180deg, #08224a 0%, #0d3569 100%);
             border-right: 1px solid rgba(255, 255, 255, 0.08);
         }
 
@@ -117,11 +120,11 @@ def inject_custom_css() -> None:
         }
 
         .hero-shell {
-            background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(249,252,255,0.88) 100%);
+            background: linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(245,251,255,0.92) 100%);
             border: 1px solid var(--line);
             border-radius: 26px;
             padding: 1.4rem 1.5rem 1.5rem 1.5rem;
-            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 24px 80px rgba(8, 34, 74, 0.09);
             position: relative;
             overflow: hidden;
         }
@@ -132,7 +135,7 @@ def inject_custom_css() -> None:
             inset: auto -80px -90px auto;
             width: 240px;
             height: 240px;
-            background: radial-gradient(circle, rgba(255, 122, 24, 0.18), transparent 65%);
+            background: radial-gradient(circle, rgba(30, 199, 192, 0.24), transparent 65%);
         }
 
         .hero-kicker {
@@ -144,8 +147,8 @@ def inject_custom_css() -> None:
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--accent-2);
-            background: rgba(15, 155, 215, 0.1);
-            border: 1px solid rgba(15, 155, 215, 0.14);
+            background: rgba(13, 92, 171, 0.09);
+            border: 1px solid rgba(13, 92, 171, 0.15);
             border-radius: 999px;
             padding: 0.45rem 0.8rem;
             width: fit-content;
@@ -160,7 +163,7 @@ def inject_custom_css() -> None:
         }
 
         .hero-copy {
-            color: #516078;
+            color: var(--muted);
             font-size: 1.02rem;
             line-height: 1.7;
             max-width: 54rem;
@@ -177,10 +180,10 @@ def inject_custom_css() -> None:
         .flow-pill {
             border-radius: 999px;
             padding: 0.58rem 0.92rem;
-            background: rgba(15, 23, 42, 0.04);
-            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(13, 92, 171, 0.05);
+            border: 1px solid rgba(13, 92, 171, 0.1);
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
             font-size: 0.92rem;
         }
 
@@ -199,8 +202,8 @@ def inject_custom_css() -> None:
         }
 
         .status-chip.ready {
-            color: #056a58;
-            background: rgba(8, 153, 129, 0.14);
+            color: #0c6e67;
+            background: rgba(30, 199, 192, 0.16);
         }
 
         .status-chip.warn {
@@ -209,8 +212,8 @@ def inject_custom_css() -> None:
         }
 
         .status-chip.band {
-            color: #005b86;
-            background: rgba(15, 155, 215, 0.13);
+            color: #0d5cab;
+            background: rgba(13, 92, 171, 0.12);
         }
 
         .command-card {
@@ -218,20 +221,205 @@ def inject_custom_css() -> None:
             border: 1px solid var(--line);
             border-radius: 22px;
             padding: 1.1rem 1.15rem;
-            box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05);
+            box-shadow: 0 16px 48px rgba(8, 34, 74, 0.05);
         }
 
         .command-card h4 {
             margin: 0 0 0.45rem 0;
-            color: #0f172a;
+            color: var(--ink);
             font-size: 1rem;
         }
 
         .command-card p {
             margin: 0;
-            color: #516078;
+            color: var(--muted);
             line-height: 1.6;
             font-size: 0.94rem;
+        }
+
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .agent-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(243,249,255,0.95) 100%);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 1rem;
+            box-shadow: 0 18px 40px rgba(8, 34, 74, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .agent-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-2), var(--accent));
+            opacity: 0.9;
+        }
+
+        .agent-card.active {
+            border-color: rgba(30, 199, 192, 0.45);
+            box-shadow: 0 0 0 1px rgba(30, 199, 192, 0.18), 0 18px 42px var(--glow);
+            animation: agentPulse 1.1s ease-in-out infinite;
+        }
+
+        .agent-card.done {
+            border-color: rgba(30, 199, 192, 0.32);
+        }
+
+        .agent-card.waiting {
+            opacity: 0.88;
+        }
+
+        .agent-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.7rem;
+        }
+
+        .agent-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            background: linear-gradient(135deg, rgba(13, 92, 171, 0.12), rgba(30, 199, 192, 0.16));
+            color: var(--accent-3);
+        }
+
+        .agent-state {
+            min-width: 0;
+        }
+
+        .agent-name {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: var(--ink);
+            margin: 0;
+        }
+
+        .agent-role {
+            margin: 0.18rem 0 0 0;
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+
+        .agent-badge {
+            border-radius: 999px;
+            padding: 0.24rem 0.56rem;
+            font-size: 0.76rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .agent-badge.active {
+            background: rgba(30, 199, 192, 0.18);
+            color: #0b736c;
+        }
+
+        .agent-badge.done {
+            background: rgba(13, 92, 171, 0.12);
+            color: #0d5cab;
+        }
+
+        .agent-badge.waiting {
+            background: rgba(84, 112, 143, 0.12);
+            color: #5e738e;
+        }
+
+        .agent-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.85rem;
+        }
+
+        .agent-led {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #9fb0c3;
+            box-shadow: 0 0 0 rgba(30, 199, 192, 0);
+        }
+
+        .agent-led.active {
+            background: var(--accent);
+            box-shadow: 0 0 0 8px rgba(30, 199, 192, 0.14);
+            animation: ledBlink 0.9s ease-in-out infinite;
+        }
+
+        .agent-led.done {
+            background: var(--accent-2);
+        }
+
+        .agent-led.waiting {
+            background: #aab8c6;
+        }
+
+        .orchestration-shell {
+            background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(245,250,255,0.98) 100%);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 1rem 1.1rem 1.15rem 1.1rem;
+            box-shadow: 0 18px 42px rgba(8, 34, 74, 0.06);
+        }
+
+        .orchestration-top {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 0.8rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .orchestration-copy {
+            color: var(--muted);
+            margin: 0;
+            max-width: 42rem;
+        }
+
+        .kpi-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+        }
+
+        .kpi-pill {
+            padding: 0.58rem 0.8rem;
+            border-radius: 16px;
+            background: rgba(13, 92, 171, 0.07);
+            border: 1px solid rgba(13, 92, 171, 0.1);
+        }
+
+        .kpi-pill strong {
+            display: block;
+            font-size: 1rem;
+            color: var(--ink);
+        }
+
+        .kpi-pill span {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        @keyframes agentPulse {
+            0% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(30, 199, 192, 0.16), 0 18px 42px rgba(8, 34, 74, 0.06); }
+            50% { transform: translateY(-2px); box-shadow: 0 0 0 8px rgba(30, 199, 192, 0.07), 0 22px 48px rgba(8, 34, 74, 0.08); }
+            100% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(30, 199, 192, 0.16), 0 18px 42px rgba(8, 34, 74, 0.06); }
+        }
+
+        @keyframes ledBlink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(1.15); }
         }
 
         [data-testid="stMetric"] {
@@ -239,33 +427,45 @@ def inject_custom_css() -> None:
             border: 1px solid var(--line);
             border-radius: 22px;
             padding: 0.7rem 0.95rem;
-            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
+            box-shadow: 0 12px 34px rgba(8, 34, 74, 0.05);
         }
 
         [data-testid="stMetricLabel"] {
-            color: #516078;
+            color: var(--muted);
             font-weight: 700;
         }
 
         .section-title {
             font-size: 1.2rem;
             font-weight: 800;
-            color: #0f172a;
+            color: var(--ink);
             margin-bottom: 0.8rem;
         }
 
         .stButton > button {
-            background: linear-gradient(90deg, #ff7a18 0%, #ff9e2c 100%);
+            background: linear-gradient(90deg, #0d5cab 0%, #1ec7c0 100%);
             border: none;
             color: white;
             font-weight: 800;
             border-radius: 16px;
             padding: 0.85rem 1rem;
-            box-shadow: 0 14px 30px rgba(255, 122, 24, 0.28);
+            box-shadow: 0 14px 30px rgba(13, 92, 171, 0.28);
         }
 
         .stButton > button:hover {
-            background: linear-gradient(90deg, #ef6f11 0%, #ff8f16 100%);
+            background: linear-gradient(90deg, #094b8f 0%, #18b6b0 100%);
+        }
+
+        @media (max-width: 980px) {
+            .agent-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .agent-grid {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """,
@@ -359,6 +559,71 @@ def render_architecture_diagram() -> None:
             )
         else:
             st.info("Architecture diagram asset not found.")
+
+
+def render_agent_orchestration_board(
+    agent_states: dict[str, str], band_config: BandConfig
+) -> None:
+    agent_specs = [
+        ("QoE Monitoring Agent", "Monitor thresholds", "📡"),
+        ("Diagnosis Agent", "Infer root cause", "🧠"),
+        ("Recovery Action Agent", "Plan safe actions", "🛠️"),
+        ("Customer Care Agent", "Prepare outreach", "💬"),
+    ]
+    remote_count = len(band_config.participants) + (1 if band_config.agent_id else 0)
+    html_cards: list[str] = []
+    for name, role, icon in agent_specs:
+        state = agent_states.get(name, "waiting")
+        label = {
+            "active": "Running",
+            "done": "Complete",
+            "waiting": "Standby",
+        }.get(state, "Standby")
+        html_cards.append(
+            f"""
+            <div class="agent-card {state}">
+                <div class="agent-head">
+                    <div style="display:flex; gap:0.8rem; align-items:center;">
+                        <div class="agent-icon">{icon}</div>
+                        <div class="agent-state">
+                            <p class="agent-name">{name}</p>
+                            <p class="agent-role">{role}</p>
+                        </div>
+                    </div>
+                    <span class="agent-badge {state}">{label}</span>
+                </div>
+                <div class="agent-meta">
+                    <span style="font-size:0.82rem; color:var(--muted);">Core specialist</span>
+                    <span class="agent-led {state}"></span>
+                </div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <div class="orchestration-shell">
+            <div class="orchestration-top">
+                <div>
+                    <div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>
+                    <p class="orchestration-copy">
+                        This board shows how many agents are available for the demo and which specialist
+                        is actively processing the case right now. Active agents pulse while their step runs.
+                    </p>
+                </div>
+                <div class="kpi-strip">
+                    <div class="kpi-pill"><strong>4</strong><span>Core FlowWatch agents</span></div>
+                    <div class="kpi-pill"><strong>{remote_count}</strong><span>Band-connected agents</span></div>
+                    <div class="kpi-pill"><strong>{sum(1 for value in agent_states.values() if value == 'done')}</strong><span>Completed steps</span></div>
+                </div>
+            </div>
+            <div class="agent-grid">
+                {''.join(html_cards)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -947,6 +1212,17 @@ def main() -> None:
     render_overview_cards()
     st.write("")
 
+    default_agent_states = {
+        "QoE Monitoring Agent": "waiting",
+        "Diagnosis Agent": "waiting",
+        "Recovery Action Agent": "waiting",
+        "Customer Care Agent": "waiting",
+    }
+    orchestration_placeholder = st.empty()
+    orchestration_placeholder.markdown("")
+    with orchestration_placeholder.container():
+        render_agent_orchestration_board(default_agent_states, band_config)
+
     metrics = st.columns(5)
     metrics[0].metric("QoE Score", telemetry["qoe_score"])
     metrics[1].metric("Bitrate", f"{telemetry['bitrate_mbps']} Mbps")
@@ -988,8 +1264,15 @@ def main() -> None:
         room_id = f"band-room-{telemetry['customer_id'].lower()}"
         communication_log: list[dict[str, Any]] = []
         band_result: dict[str, Any] | None = None
+        agent_states = dict(default_agent_states)
+
+        agent_states["QoE Monitoring Agent"] = "active"
+        with orchestration_placeholder.container():
+            render_agent_orchestration_board(agent_states, band_config)
+        time.sleep(0.25)
 
         qoe_result = qoe_monitoring_agent(telemetry)
+        agent_states["QoE Monitoring Agent"] = "done"
         communication_log.append(
             create_band_event(
                 step=1,
@@ -1003,6 +1286,8 @@ def main() -> None:
         render_agent_box("1. QoE Monitoring Agent", qoe_result, is_json=True)
 
         if qoe_result["qoe_status"] == "Good":
+            with orchestration_placeholder.container():
+                render_agent_orchestration_board(agent_states, band_config)
             shared_context = {
                 "room_status": "Monitoring complete",
                 "customer_id": telemetry["customer_id"],
@@ -1027,8 +1312,14 @@ def main() -> None:
             render_hackathon_alignment()
             return
 
+        agent_states["Diagnosis Agent"] = "active"
+        with orchestration_placeholder.container():
+            render_agent_orchestration_board(agent_states, band_config)
+        time.sleep(0.2)
+
         with st.spinner("Running diagnosis, recovery, customer care, and Band sync..."):
             diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
+            agent_states["Diagnosis Agent"] = "done"
             communication_log.append(
                 create_band_event(
                     step=2,
@@ -1043,10 +1334,15 @@ def main() -> None:
                     },
                 )
             )
+            agent_states["Recovery Action Agent"] = "active"
+            with orchestration_placeholder.container():
+                render_agent_orchestration_board(agent_states, band_config)
+            time.sleep(0.2)
 
             recovery_text = recovery_action_agent(
                 telemetry, diagnosis_text, selected_model
             )
+            agent_states["Recovery Action Agent"] = "done"
             communication_log.append(
                 create_band_event(
                     step=3,
@@ -1061,10 +1357,15 @@ def main() -> None:
                     },
                 )
             )
+            agent_states["Customer Care Agent"] = "active"
+            with orchestration_placeholder.container():
+                render_agent_orchestration_board(agent_states, band_config)
+            time.sleep(0.2)
 
             customer_care_text = customer_care_agent(
                 telemetry, diagnosis_text, recovery_text, selected_model
             )
+            agent_states["Customer Care Agent"] = "done"
             communication_log.append(
                 create_band_event(
                     step=4,
@@ -1089,6 +1390,9 @@ def main() -> None:
                 customer_care_text,
                 selected_model,
             )
+
+        with orchestration_placeholder.container():
+            render_agent_orchestration_board(agent_states, band_config)
 
         render_agent_box("2. Diagnosis Agent", diagnosis_text)
         render_agent_box("3. Recovery Action Agent", recovery_text)
