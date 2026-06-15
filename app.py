@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+import uuid
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
@@ -497,7 +498,8 @@ async def publish_workflow_to_band(
         api_key=band_config.api_key,
         base_url=band_config.rest_url.rstrip("/"),
     )
-    task_id = f"flowwatch-{telemetry['customer_id'].lower()}"
+    # Band validates task_id as a UUID, so use a stable-compatible generated UUID per run.
+    task_id = str(uuid.uuid4())
     room_response = await client.agent_api_chats.create_agent_chat(
         chat=ChatRoomRequest(task_id=task_id),
         request_options=DEFAULT_REQUEST_OPTIONS,
