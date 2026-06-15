@@ -40,8 +40,6 @@ MODEL_OPTIONS = [
     "google/gemma-3-4b-it",
 ]
 DEFAULT_BAND_REST_URL = "https://app.band.ai"
-ARCHITECTURE_DIAGRAM_PATH = "assets/flowwatch-architecture.png"
-
 DEFAULT_TELEMETRY = {
     "customer_id": "CUST_1001",
     "device_id": "STB_4455",
@@ -145,7 +143,7 @@ def inject_custom_css() -> None:
             background: linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(245,251,255,0.92) 100%);
             border: 1px solid var(--line);
             border-radius: 26px;
-            padding: 1.4rem 1.5rem 1.5rem 1.5rem;
+            padding: 1.2rem 1.3rem 1.25rem 1.3rem;
             box-shadow: 0 24px 80px rgba(8, 34, 74, 0.09);
             position: relative;
             overflow: hidden;
@@ -190,10 +188,10 @@ def inject_custom_css() -> None:
         }
 
         .hero-title {
-            font-size: 3.2rem;
+            font-size: 2.7rem;
             line-height: 1;
             font-weight: 800;
-            margin: 0.95rem 0 0.7rem 0;
+            margin: 0.8rem 0 0.55rem 0;
             color: var(--ink);
         }
 
@@ -254,8 +252,8 @@ def inject_custom_css() -> None:
         .command-card {
             background: var(--panel);
             border: 1px solid var(--line);
-            border-radius: 22px;
-            padding: 1.1rem 1.15rem;
+            border-radius: 18px;
+            padding: 0.95rem 1rem;
             box-shadow: 0 16px 48px rgba(8, 34, 74, 0.05);
         }
 
@@ -275,12 +273,12 @@ def inject_custom_css() -> None:
         .agent-card {
             background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(243,249,255,0.95) 100%);
             border: 1px solid var(--line);
-            border-radius: 22px;
-            padding: 1rem;
+            border-radius: 18px;
+            padding: 0.9rem;
             box-shadow: 0 18px 40px rgba(8, 34, 74, 0.06);
             position: relative;
             overflow: hidden;
-            min-height: 168px;
+            min-height: 142px;
         }
 
         .agent-card::before {
@@ -310,7 +308,7 @@ def inject_custom_css() -> None:
             display: flex;
             align-items: flex-start;
             gap: 0.75rem;
-            margin-bottom: 0.7rem;
+            margin-bottom: 0.5rem;
         }
 
         .agent-icon {
@@ -331,7 +329,7 @@ def inject_custom_css() -> None:
         }
 
         .agent-name {
-            font-size: 0.9rem;
+            font-size: 0.92rem;
             font-weight: 800;
             color: var(--ink);
             margin: 0;
@@ -342,8 +340,16 @@ def inject_custom_css() -> None:
         .agent-role {
             margin: 0.18rem 0 0 0;
             color: var(--muted);
+            font-size: 0.8rem;
+            line-height: 1.35;
+        }
+
+        .agent-message {
+            color: var(--muted);
             font-size: 0.82rem;
             line-height: 1.45;
+            margin-top: 0.35rem;
+            min-height: 2.7rem;
         }
 
         .agent-badge {
@@ -373,7 +379,7 @@ def inject_custom_css() -> None:
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 0.85rem;
+            margin-top: 0.55rem;
         }
 
         .agent-led {
@@ -399,8 +405,8 @@ def inject_custom_css() -> None:
         }
 
         .kpi-pill {
-            padding: 0.58rem 0.8rem;
-            border-radius: 16px;
+            padding: 0.5rem 0.72rem;
+            border-radius: 14px;
             background: rgba(13, 92, 171, 0.07);
             border: 1px solid rgba(13, 92, 171, 0.1);
             margin-bottom: 0.6rem;
@@ -479,10 +485,17 @@ def inject_custom_css() -> None:
         }
 
         .section-title {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 800;
             color: var(--ink);
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .compact-note {
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.55;
+            margin-bottom: 0.6rem;
         }
 
         .stButton > button {
@@ -498,7 +511,6 @@ def inject_custom_css() -> None:
         .stButton > button:hover {
             background: linear-gradient(90deg, #094b8f 0%, #18b6b0 100%);
         }
-
         </style>
         """,
         unsafe_allow_html=True,
@@ -572,28 +584,10 @@ def render_overview_cards() -> None:
         )
 
 
-def render_architecture_diagram() -> None:
-    with st.container(border=True):
-        st.markdown(
-            '<div class="section-title">Technical Architecture</div>',
-            unsafe_allow_html=True,
-        )
-        st.write(
-            "This architecture view now sits inside the product demo so you can explain "
-            "telemetry ingestion, agent orchestration, Band collaboration, and outputs "
-            "without leaving the app."
-        )
-        if os.path.exists(ARCHITECTURE_DIAGRAM_PATH):
-            st.image(
-                ARCHITECTURE_DIAGRAM_PATH,
-                caption="FlowWatch technical architecture for the hackathon demo",
-                use_container_width=True,
-            )
-        else:
-            st.info("Architecture diagram asset not found.")
-
 def render_agent_orchestration_board(
-    agent_states: dict[str, str], band_config: BandConfig
+    agent_states: dict[str, str],
+    agent_messages: dict[str, str],
+    band_config: BandConfig,
 ) -> None:
     agent_specs = [
         ("QoE Monitoring Agent", "Monitor thresholds", "📡"),
@@ -609,9 +603,9 @@ def render_agent_orchestration_board(
                 '<div class="section-title" style="margin-bottom:0.35rem;">Live Agent Orchestration</div>',
                 unsafe_allow_html=True,
             )
-            st.write(
-                "This board shows how many agents are available for the demo and which specialist "
-                "is actively processing the case right now. Active agents pulse while their step runs."
+            st.markdown(
+                '<div class="compact-note">Compact live agent cards show who is active right now and the latest handoff message for each specialist.</div>',
+                unsafe_allow_html=True,
             )
         with kpi_col:
             st.markdown(
@@ -627,36 +621,35 @@ def render_agent_orchestration_board(
                 unsafe_allow_html=True,
             )
 
-        for row_start in range(0, len(agent_specs), 2):
-            columns = st.columns(2, gap="large")
-            row_agents = agent_specs[row_start : row_start + 2]
-            for column, (name, role, icon) in zip(columns, row_agents):
-                state = agent_states.get(name, "waiting")
-                label = {
-                    "active": "Running",
-                    "done": "Complete",
-                    "waiting": "Standby",
-                }.get(state, "Standby")
-                with column:
-                    st.markdown(
-                        f"""
-                        <div class="agent-card {state}">
-                            <div class="agent-head">
-                                <div class="agent-icon">{icon}</div>
-                                <div class="agent-state">
-                                    <p class="agent-name">{name}</p>
-                                    <p class="agent-role">{role}</p>
-                                </div>
+        columns = st.columns(4, gap="medium")
+        for column, (name, role, icon) in zip(columns, agent_specs):
+            state = agent_states.get(name, "waiting")
+            label = {
+                "active": "Running",
+                "done": "Complete",
+                "waiting": "Standby",
+            }.get(state, "Standby")
+            message = agent_messages.get(name, "Awaiting handoff")
+            with column:
+                st.markdown(
+                    f"""
+                    <div class="agent-card {state}">
+                        <div class="agent-head">
+                            <div class="agent-icon">{icon}</div>
+                            <div class="agent-state">
+                                <p class="agent-name">{name}</p>
+                                <p class="agent-role">{role}</p>
                             </div>
-                            <div class="agent-meta">
-                                <span class="agent-badge {state}">{label}</span>
-                                <span class="agent-led {state}"></span>
-                            </div>
-                            <div style="margin-top:0.75rem; font-size:0.82rem; color:#3f5e82;">Core specialist</div>
                         </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        <div class="agent-message">{message}</div>
+                        <div class="agent-meta">
+                            <span class="agent-badge {state}">{label}</span>
+                            <span class="agent-led {state}"></span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -864,52 +857,52 @@ def build_band_config() -> BandConfig:
     participants: list[BandParticipant] = []
 
     with st.sidebar:
-        st.header("Band Live Layer")
-        band_enabled = st.checkbox(
-            "Enable Band room publishing",
-            value=bool(get_secret("BAND_API_KEY")),
-            help="Publish the workflow into a real Band room using the official SDK client.",
-        )
-        band_agent_id = st.text_input(
-            "Band orchestrator agent ID",
-            value=get_secret("BAND_AGENT_ID"),
-        )
-        band_api_key = st.text_input(
-            "Band orchestrator API key",
-            value=get_secret("BAND_API_KEY"),
-            type="password",
-        )
-        band_rest_url = st.text_input(
-            "Band REST URL",
-            value=get_secret("BAND_REST_URL", DEFAULT_BAND_REST_URL),
-        )
-
-        with st.expander("Optional Band participant agents"):
-            role_fields = [
-                ("Diagnosis Agent", "BAND_DIAGNOSIS_AGENT_ID", "BAND_DIAGNOSIS_AGENT_NAME"),
-                ("Recovery Action Agent", "BAND_RECOVERY_AGENT_ID", "BAND_RECOVERY_AGENT_NAME"),
-                ("Customer Care Agent", "BAND_CUSTOMER_AGENT_ID", "BAND_CUSTOMER_AGENT_NAME"),
-            ]
-            for role, id_key, name_key in role_fields:
-                participant_id = st.text_input(role + " participant ID", value=get_secret(id_key))
-                display_name = st.text_input(
-                    role + " display name",
-                    value=get_secret(name_key, role),
-                )
-                if participant_id:
-                    participants.append(
-                        BandParticipant(
-                            role=role,
-                            participant_id=participant_id,
-                            display_name=display_name or role,
-                        )
-                    )
-
-        if band_enabled and not BAND_SDK_AVAILABLE:
-            st.warning(
-                "Band SDK package is not installed in this environment yet. "
-                "Add `band-sdk` to requirements before expecting live room publishing."
+        with st.expander("Band Live Layer", expanded=False):
+            band_enabled = st.checkbox(
+                "Enable Band room publishing",
+                value=bool(get_secret("BAND_API_KEY")),
+                help="Publish the workflow into a real Band room using the official SDK client.",
             )
+            band_agent_id = st.text_input(
+                "Band orchestrator agent ID",
+                value=get_secret("BAND_AGENT_ID"),
+            )
+            band_api_key = st.text_input(
+                "Band orchestrator API key",
+                value=get_secret("BAND_API_KEY"),
+                type="password",
+            )
+            band_rest_url = st.text_input(
+                "Band REST URL",
+                value=get_secret("BAND_REST_URL", DEFAULT_BAND_REST_URL),
+            )
+
+            with st.expander("Optional Band participant agents"):
+                role_fields = [
+                    ("Diagnosis Agent", "BAND_DIAGNOSIS_AGENT_ID", "BAND_DIAGNOSIS_AGENT_NAME"),
+                    ("Recovery Action Agent", "BAND_RECOVERY_AGENT_ID", "BAND_RECOVERY_AGENT_NAME"),
+                    ("Customer Care Agent", "BAND_CUSTOMER_AGENT_ID", "BAND_CUSTOMER_AGENT_NAME"),
+                ]
+                for role, id_key, name_key in role_fields:
+                    participant_id = st.text_input(role + " participant ID", value=get_secret(id_key))
+                    display_name = st.text_input(
+                        role + " display name",
+                        value=get_secret(name_key, role),
+                    )
+                    if participant_id:
+                        participants.append(
+                            BandParticipant(
+                                role=role,
+                                participant_id=participant_id,
+                                display_name=display_name or role,
+                            )
+                        )
+
+            if band_enabled and not BAND_SDK_AVAILABLE:
+                st.warning(
+                    "Band SDK package is not installed in this environment yet. "
+                    "Add `band-sdk` to requirements before expecting live room publishing."
+                )
 
     return BandConfig(
         enabled=band_enabled,
@@ -1180,10 +1173,43 @@ def render_hackathon_alignment() -> None:
     st.table(alignment_rows)
 
 
+def load_live_telemetry(endpoint: str) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        response = requests.get(endpoint, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as exc:
+        return None, f"Unable to fetch telemetry: {exc}"
+    except ValueError:
+        return None, "Telemetry endpoint did not return valid JSON."
+
+    expected_keys = set(DEFAULT_TELEMETRY.keys())
+    if not expected_keys.issubset(data.keys()):
+        missing = ", ".join(sorted(expected_keys - set(data.keys())))
+        return None, f"Telemetry payload is missing keys: {missing}"
+
+    normalized = {
+        "customer_id": str(data["customer_id"]),
+        "device_id": str(data["device_id"]),
+        "service": str(data["service"]),
+        "bitrate_mbps": float(data["bitrate_mbps"]),
+        "buffering_ratio": float(data["buffering_ratio"]),
+        "latency_ms": int(data["latency_ms"]),
+        "packet_loss": float(data["packet_loss"]),
+        "app_crashes": int(data["app_crashes"]),
+        "qoe_score": int(data["qoe_score"]),
+    }
+    return normalized, None
+
+
 def main() -> None:
     st.set_page_config(page_title="FlowWatch", page_icon="📺", layout="wide")
     inject_custom_css()
     band_config = build_band_config()
+    if "telemetry_source_mode" not in st.session_state:
+        st.session_state.telemetry_source_mode = "Manual"
+    if "telemetry_values" not in st.session_state:
+        st.session_state.telemetry_values = DEFAULT_TELEMETRY.copy()
 
     with st.sidebar:
         st.header("Model & Telemetry")
@@ -1193,52 +1219,75 @@ def main() -> None:
             index=MODEL_OPTIONS.index(DEFAULT_MODEL),
             help="Switch models if one provider route is temporarily unavailable.",
         )
+        st.session_state.telemetry_source_mode = st.radio(
+            "Telemetry source",
+            ["Manual", "Live API fetch"],
+            index=0 if st.session_state.telemetry_source_mode == "Manual" else 1,
+        )
+
+        if st.session_state.telemetry_source_mode == "Live API fetch":
+            live_endpoint = st.text_input(
+                "Telemetry API URL",
+                value=st.session_state.get("live_endpoint", ""),
+                help="Endpoint should return JSON with the same telemetry keys used by FlowWatch.",
+            )
+            st.session_state.live_endpoint = live_endpoint
+            if st.button("Load live telemetry", use_container_width=True):
+                telemetry_data, error = load_live_telemetry(live_endpoint)
+                if error:
+                    st.error(error)
+                elif telemetry_data is not None:
+                    st.session_state.telemetry_values = telemetry_data
+                    st.success("Live telemetry loaded into the dashboard.")
+
+        telemetry_defaults = st.session_state.telemetry_values
         telemetry = {
             "customer_id": st.text_input(
-                "Customer ID", value=DEFAULT_TELEMETRY["customer_id"]
+                "Customer ID", value=telemetry_defaults["customer_id"]
             ),
             "device_id": st.text_input(
-                "Device ID", value=DEFAULT_TELEMETRY["device_id"]
+                "Device ID", value=telemetry_defaults["device_id"]
             ),
-            "service": st.text_input("Service", value=DEFAULT_TELEMETRY["service"]),
+            "service": st.text_input("Service", value=telemetry_defaults["service"]),
             "bitrate_mbps": st.number_input(
                 "Bitrate Mbps",
                 min_value=0.0,
-                value=float(DEFAULT_TELEMETRY["bitrate_mbps"]),
+                value=float(telemetry_defaults["bitrate_mbps"]),
                 step=0.1,
             ),
             "buffering_ratio": st.number_input(
                 "Buffering ratio %",
                 min_value=0.0,
-                value=float(DEFAULT_TELEMETRY["buffering_ratio"]),
+                value=float(telemetry_defaults["buffering_ratio"]),
                 step=0.1,
             ),
             "latency_ms": st.number_input(
                 "Latency ms",
                 min_value=0,
-                value=int(DEFAULT_TELEMETRY["latency_ms"]),
+                value=int(telemetry_defaults["latency_ms"]),
                 step=1,
             ),
             "packet_loss": st.number_input(
                 "Packet loss %",
                 min_value=0.0,
-                value=float(DEFAULT_TELEMETRY["packet_loss"]),
+                value=float(telemetry_defaults["packet_loss"]),
                 step=0.1,
             ),
             "app_crashes": st.number_input(
                 "App crashes",
                 min_value=0,
-                value=int(DEFAULT_TELEMETRY["app_crashes"]),
+                value=int(telemetry_defaults["app_crashes"]),
                 step=1,
             ),
             "qoe_score": st.number_input(
                 "QoE score",
                 min_value=0,
                 max_value=100,
-                value=int(DEFAULT_TELEMETRY["qoe_score"]),
+                value=int(telemetry_defaults["qoe_score"]),
                 step=1,
             ),
         }
+        st.session_state.telemetry_values = telemetry.copy()
 
     render_hero(band_config)
     st.write("")
@@ -1251,17 +1300,30 @@ def main() -> None:
         "Recovery Action Agent": "waiting",
         "Customer Care Agent": "waiting",
     }
+    default_agent_messages = {
+        "QoE Monitoring Agent": "Awaiting telemetry",
+        "Diagnosis Agent": "Waiting for QoE handoff",
+        "Recovery Action Agent": "Waiting for diagnosis",
+        "Customer Care Agent": "Waiting for recovery plan",
+    }
     orchestration_placeholder = st.empty()
     orchestration_placeholder.markdown("")
     with orchestration_placeholder.container():
-        render_agent_orchestration_board(default_agent_states, band_config)
+        render_agent_orchestration_board(
+            default_agent_states, default_agent_messages, band_config
+        )
 
-    metrics = st.columns(5)
+    metrics = st.columns(6)
     metrics[0].metric("QoE Score", telemetry["qoe_score"])
-    metrics[1].metric("Bitrate", f"{telemetry['bitrate_mbps']} Mbps")
-    metrics[2].metric("Buffering", f"{telemetry['buffering_ratio']}%")
-    metrics[3].metric("Latency", f"{telemetry['latency_ms']} ms")
-    metrics[4].metric("Packet Loss", f"{telemetry['packet_loss']}%")
+    metrics[1].metric(
+        "Ideal QoE",
+        ">= 80",
+        delta=f"{telemetry['qoe_score'] - 80}",
+    )
+    metrics[2].metric("Bitrate", f"{telemetry['bitrate_mbps']} Mbps")
+    metrics[3].metric("Buffering", f"{telemetry['buffering_ratio']}%")
+    metrics[4].metric("Latency", f"{telemetry['latency_ms']} ms")
+    metrics[5].metric("Packet Loss", f"{telemetry['packet_loss']}%")
 
     with st.expander("Raw telemetry JSON"):
         st.json(telemetry)
@@ -1296,14 +1358,17 @@ def main() -> None:
         communication_log: list[dict[str, Any]] = []
         band_result: dict[str, Any] | None = None
         agent_states = dict(default_agent_states)
+        agent_messages = dict(default_agent_messages)
 
         agent_states["QoE Monitoring Agent"] = "active"
+        agent_messages["QoE Monitoring Agent"] = "Reading telemetry and checking thresholds"
         with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, band_config)
+            render_agent_orchestration_board(agent_states, agent_messages, band_config)
         time.sleep(0.25)
 
         qoe_result = qoe_monitoring_agent(telemetry)
         agent_states["QoE Monitoring Agent"] = "done"
+        agent_messages["QoE Monitoring Agent"] = qoe_result["customer_impact_summary"]
         communication_log.append(
             create_band_event(
                 step=1,
@@ -1314,11 +1379,9 @@ def main() -> None:
                 payload=qoe_result,
             )
         )
-        render_agent_box("1. QoE Monitoring Agent", qoe_result, is_json=True)
-
         if qoe_result["qoe_status"] == "Good":
             with orchestration_placeholder.container():
-                render_agent_orchestration_board(agent_states, band_config)
+                render_agent_orchestration_board(agent_states, agent_messages, band_config)
             shared_context = {
                 "room_status": "Monitoring complete",
                 "customer_id": telemetry["customer_id"],
@@ -1336,21 +1399,28 @@ def main() -> None:
                 customer_care_text=None,
                 model_name=selected_model,
             )
-            render_band_room(room_id, shared_context, communication_log, band_result)
             st.success(
                 "QoE looks healthy. FlowWatch stopped after monitoring because no further action is required."
             )
-            render_hackathon_alignment()
+            tabs = st.tabs(["Monitoring", "Band", "Alignment"])
+            with tabs[0]:
+                render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
+            with tabs[1]:
+                render_band_room(room_id, shared_context, communication_log, band_result)
+            with tabs[2]:
+                render_hackathon_alignment()
             return
 
         agent_states["Diagnosis Agent"] = "active"
+        agent_messages["Diagnosis Agent"] = "Analyzing telemetry for root cause"
         with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, band_config)
+            render_agent_orchestration_board(agent_states, agent_messages, band_config)
         time.sleep(0.2)
 
         with st.spinner("Running diagnosis, recovery, customer care, and Band sync..."):
             diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
             agent_states["Diagnosis Agent"] = "done"
+            agent_messages["Diagnosis Agent"] = "Root cause assessment prepared"
             communication_log.append(
                 create_band_event(
                     step=2,
@@ -1366,14 +1436,16 @@ def main() -> None:
                 )
             )
             agent_states["Recovery Action Agent"] = "active"
+            agent_messages["Recovery Action Agent"] = "Designing safe recovery sequence"
             with orchestration_placeholder.container():
-                render_agent_orchestration_board(agent_states, band_config)
+                render_agent_orchestration_board(agent_states, agent_messages, band_config)
             time.sleep(0.2)
 
             recovery_text = recovery_action_agent(
                 telemetry, diagnosis_text, selected_model
             )
             agent_states["Recovery Action Agent"] = "done"
+            agent_messages["Recovery Action Agent"] = "Recommended actions are ready"
             communication_log.append(
                 create_band_event(
                     step=3,
@@ -1389,14 +1461,16 @@ def main() -> None:
                 )
             )
             agent_states["Customer Care Agent"] = "active"
+            agent_messages["Customer Care Agent"] = "Drafting customer and internal support messages"
             with orchestration_placeholder.container():
-                render_agent_orchestration_board(agent_states, band_config)
+                render_agent_orchestration_board(agent_states, agent_messages, band_config)
             time.sleep(0.2)
 
             customer_care_text = customer_care_agent(
                 telemetry, diagnosis_text, recovery_text, selected_model
             )
             agent_states["Customer Care Agent"] = "done"
+            agent_messages["Customer Care Agent"] = "Customer message and ticket summary ready"
             communication_log.append(
                 create_band_event(
                     step=4,
@@ -1423,11 +1497,7 @@ def main() -> None:
             )
 
         with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, band_config)
-
-        render_agent_box("2. Diagnosis Agent", diagnosis_text)
-        render_agent_box("3. Recovery Action Agent", recovery_text)
-        render_agent_box("4. Customer Care Agent", customer_care_text)
+            render_agent_orchestration_board(agent_states, agent_messages, band_config)
 
         shared_context = {
             "room_status": "Escalation coordinated",
@@ -1444,8 +1514,28 @@ def main() -> None:
             "selected_model": selected_model,
             "next_action": "Proactive outreach and continued monitoring",
         }
-        render_band_room(room_id, shared_context, communication_log, band_result)
-        render_hackathon_alignment()
+        result_tabs = st.tabs(
+            [
+                "Monitoring",
+                "Diagnosis",
+                "Recovery",
+                "Customer Care",
+                "Band",
+                "Alignment",
+            ]
+        )
+        with result_tabs[0]:
+            render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
+        with result_tabs[1]:
+            render_agent_box("Diagnosis Agent", diagnosis_text)
+        with result_tabs[2]:
+            render_agent_box("Recovery Action Agent", recovery_text)
+        with result_tabs[3]:
+            render_agent_box("Customer Care Agent", customer_care_text)
+        with result_tabs[4]:
+            render_band_room(room_id, shared_context, communication_log, band_result)
+        with result_tabs[5]:
+            render_hackathon_alignment()
         st.success(
             "FlowWatch analysis complete. The multi-agent workflow and Band communication layer are ready for demo."
         )
