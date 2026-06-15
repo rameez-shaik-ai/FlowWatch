@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import time
-import uuid
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
@@ -498,10 +497,10 @@ async def publish_workflow_to_band(
         api_key=band_config.api_key,
         base_url=band_config.rest_url.rstrip("/"),
     )
-    # Band validates task_id as a UUID, so use a stable-compatible generated UUID per run.
-    task_id = str(uuid.uuid4())
+    # Leave task_id unset unless you have a real Band task UUID to associate with this room.
+    task_id = None
     room_response = await client.agent_api_chats.create_agent_chat(
-        chat=ChatRoomRequest(task_id=task_id),
+        chat=ChatRoomRequest(),
         request_options=DEFAULT_REQUEST_OPTIONS,
     )
     room_id = room_response.data.id
