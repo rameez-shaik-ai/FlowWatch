@@ -1,43 +1,85 @@
 # FlowWatch
 
-FlowWatch is a hackathon-ready Streamlit prototype for proactive Quality of Experience monitoring in telecom TV streaming services. It demonstrates how a multi-agent workflow can detect likely customer pain early, diagnose the probable issue, recommend safe recovery steps, and prepare customer care outputs before a complaint arrives.
+FlowWatch is a hackathon-ready Streamlit prototype for proactive telecom TV streaming QoE monitoring. It combines deterministic QoE rules, AI-assisted specialist agents, and optional Band collaboration publishing in a single demo-friendly dashboard.
 
-## Team
+## What The App Preserves
 
-**Team Name:** Stream Innovators
+- Streamlit dashboard
+- KPN/telecom-inspired UI theme
+- Manual telemetry input
+- Live API telemetry fetch
+- Random telemetry generation
+- Ideal telemetry generation
+- QoE Monitoring Agent
+- Diagnosis Agent
+- Recovery Action Agent
+- Customer Care Agent
+- AI/ML API integration
+- Band live publishing layer
+- Band participant configuration
+- Band handoff trace
+- Hackathon alignment section
 
-## Problem Statement
+## Modular Architecture
 
-TV streaming customers often experience buffering, low bitrate, crashes, or instability before contacting support. Operations teams need a lightweight way to identify at-risk sessions early, trigger guided diagnosis, and prepare proactive outreach without exposing internal technical details to the customer.
+```text
+FlowWatch/
+  app.py
+  config.py
+  models.py
+  services/
+    __init__.py
+    aiml_api.py
+    band_service.py
+    telemetry_service.py
+  agents/
+    __init__.py
+    qoe_monitoring_agent.py
+    diagnosis_agent.py
+    recovery_action_agent.py
+    customer_care_agent.py
+  ui/
+    __init__.py
+    styles.py
+    layout.py
+    components.py
+  utils/
+    __init__.py
+    qoe_scoring.py
+  assets/
+    flowwatch-architecture.png
+  requirements.txt
+  README.md
+  .env.example
+  .gitignore
+```
 
-## Solution Overview
+## Module Guide
 
-FlowWatch combines deterministic QoE monitoring with AI-assisted diagnosis, recovery planning, and customer communication. The prototype uses editable telemetry in a Streamlit dashboard so judges or operators can simulate scenarios and observe each agent handoff in a single presentation-ready app.
+- `app.py`
+  Coordinates Streamlit page setup, sidebar input flow, workflow execution, and result rendering.
+- `config.py`
+  Holds constants and the secret-loading helper.
+- `models.py`
+  Holds shared dataclasses used by the Band layer.
+- `services/aiml_api.py`
+  Wraps AI/ML API calls and handles API error cases.
+- `services/band_service.py`
+  Handles Band SDK setup, configuration, publishing, and graceful fallback if the SDK is unavailable.
+- `services/telemetry_service.py`
+  Loads and validates telemetry from live endpoints.
+- `agents/`
+  Contains the four specialist agent implementations.
+- `ui/styles.py`
+  Applies the FlowWatch visual theme.
+- `ui/layout.py`
+  Renders page-level layout sections such as the hero and hackathon alignment.
+- `ui/components.py`
+  Renders reusable UI blocks such as orchestration cards, metrics, and Band trace views.
+- `utils/qoe_scoring.py`
+  Provides QoE score calculation and demo telemetry generators.
 
-## Architecture
-
-- **Frontend:** Streamlit
-- **Rule-based agent:** QoE Monitoring Agent
-- **AI-powered agents:** Diagnosis Agent, Recovery Action Agent, Customer Care Agent
-- **LLM provider:** AI/ML API at `https://api.aimlapi.com/v1/chat/completions`
-- **Configuration:** `.env` using `python-dotenv`
-
-## Agent Workflow
-
-1. **Monitor:** The QoE Monitoring Agent scores session health using deterministic thresholds.
-2. **Diagnose:** The Diagnosis Agent identifies the most likely root cause category.
-3. **Recover:** The Recovery Action Agent proposes safe automated next steps.
-4. **Communicate:** The Customer Care Agent drafts customer-friendly outreach and an internal support summary.
-
-## Technology Stack
-
-- Python 3.11+
-- Streamlit
-- Requests
-- python-dotenv
-- AI/ML API
-
-## How to Run Locally
+## How To Run Locally
 
 1. Create and activate a virtual environment.
 2. Install dependencies:
@@ -46,16 +88,16 @@ FlowWatch combines deterministic QoE monitoring with AI-assisted diagnosis, reco
 pip install -r requirements.txt
 ```
 
-3. Copy `.env.example` to `.env` and add your API key.
+3. Copy `.env.example` to `.env` and add your keys.
 4. Start the app:
 
 ```bash
 streamlit run app.py
 ```
 
-## Environment Variable Setup
+## Environment Variables
 
-Add the following to `.env`:
+Add these values to `.env` for local runs:
 
 ```env
 AIML_API_KEY=your_ai_ml_api_key_here
@@ -64,30 +106,73 @@ BAND_API_KEY=your_band_remote_agent_api_key
 BAND_REST_URL=https://app.band.ai
 ```
 
-FlowWatch never hardcodes secrets in the source code.
+Optional Band participant agent values:
 
-## How Band Is Used
+```env
+BAND_DIAGNOSIS_AGENT_ID=
+BAND_DIAGNOSIS_AGENT_NAME=Diagnosis Agent
+BAND_RECOVERY_AGENT_ID=
+BAND_RECOVERY_AGENT_NAME=Recovery Action Agent
+BAND_CUSTOMER_AGENT_ID=
+BAND_CUSTOMER_AGENT_NAME=Customer Care Agent
+```
 
-Band is used as the live multi-agent communication layer. FlowWatch can create a real Band room for each analysis run, publish monitoring and handoff events into that room, and optionally add specialized remote agents as participants so the workflow is visible inside Band as well as inside the Streamlit dashboard.
+## AI/ML API Setup
 
-## How AI/ML API Is Used
+FlowWatch uses:
+
+- Endpoint: `https://api.aimlapi.com/v1/chat/completions`
+- Auth: Bearer token via `AIML_API_KEY`
 
 The AI/ML API powers:
 
 - Root cause diagnosis
 - Safe recovery recommendations
-- Proactive customer care outputs
+- Customer-facing and internal support communication
 
-The sidebar includes a model selector so the demo can switch between supported model routes if one fails.
+## Band Setup
 
-## Future Improvements
+FlowWatch can optionally publish each run into a live Band room.
 
-- Add autonomous Band remote agents that reply directly in the room
-- Connect to real telemetry streams instead of simulated inputs
-- Persist case history and operator actions
-- Add confidence scoring and trend analysis over time
-- Introduce approval workflows for automated remediation
+To enable it:
 
-## Submission Notes
+1. Provide `BAND_API_KEY`
+2. Optionally provide `BAND_AGENT_ID`
+3. Optionally add participant agent IDs for diagnosis, recovery, and customer-care roles
 
-FlowWatch is designed for the Band of Agents Hackathon as a practical, product-shaped prototype. It emphasizes clear agent boundaries, demo stability, safe automation, and business value for proactive telecom support.
+If `band-sdk` is not installed or not available at runtime, the app still works and shows a warning instead of crashing.
+
+Note:
+- `band-sdk` is included in `requirements.txt`
+- If your environment uses a different package name or a private index for the Band SDK, install that version and keep the same Python imports used in `services/band_service.py`
+
+## Streamlit Cloud Deployment Notes
+
+1. Push the project to GitHub.
+2. Create a Streamlit Cloud app pointing at `app.py`.
+3. Add secrets in the Streamlit Cloud app settings if you do not want to rely on `.env`.
+4. Recommended secrets:
+
+```toml
+AIML_API_KEY = "your_ai_ml_api_key_here"
+BAND_AGENT_ID = "your_band_remote_agent_uuid"
+BAND_API_KEY = "your_band_remote_agent_api_key"
+BAND_REST_URL = "https://app.band.ai"
+```
+
+Streamlit Cloud redeploys automatically when a new commit reaches the selected branch.
+
+## How The Workflow Works
+
+1. The QoE Monitoring Agent evaluates the current session using deterministic rules.
+2. If the session is healthy, FlowWatch stops after monitoring.
+3. If the session is degraded, FlowWatch calls the Diagnosis Agent.
+4. The Recovery Action Agent proposes safe next steps.
+5. The Customer Care Agent prepares outreach and internal support outputs.
+6. If Band is enabled, FlowWatch publishes the workflow into a live Band room.
+
+## Developer Notes
+
+- Secrets are never hardcoded in source code.
+- The refactor keeps the app beginner-friendly and modular.
+- The current UI and behavior are preserved while reducing the amount of logic inside `app.py`.
