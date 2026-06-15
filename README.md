@@ -59,13 +59,16 @@ Add the following to `.env`:
 
 ```env
 AIML_API_KEY=your_ai_ml_api_key_here
+BAND_AGENT_ID=your_band_remote_agent_uuid
+BAND_API_KEY=your_band_remote_agent_api_key
+BAND_REST_URL=https://app.band.ai
 ```
 
 FlowWatch never hardcodes secrets in the source code.
 
 ## How Band Is Used
 
-Band is used as the multi-agent collaboration proof layer. In the hackathon story, Band rooms can hold shared context, agent-to-agent handoff state, and collaborative execution logs, while this Streamlit app serves as the stable user-facing demo experience.
+Band is used as the live multi-agent communication layer. FlowWatch can create a real Band room for each analysis run, publish monitoring and handoff events into that room, and optionally add specialized remote agents as participants so the workflow is visible inside Band as well as inside the Streamlit dashboard.
 
 ## How AI/ML API Is Used
 
@@ -79,7 +82,7 @@ The sidebar includes a model selector so the demo can switch between supported m
 
 ## Future Improvements
 
-- Add live Band room integration for agent execution traces
+- Add autonomous Band remote agents that reply directly in the room
 - Connect to real telemetry streams instead of simulated inputs
 - Persist case history and operator actions
 - Add confidence scoring and trend analysis over time

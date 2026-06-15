@@ -1,10 +1,30 @@
+import asyncio
 import json
 import os
+from dataclasses import dataclass
+from textwrap import dedent
 from typing import Any
 
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+
+try:
+    from band.client.rest import (
+        AsyncRestClient,
+        ChatEventRequest,
+        ChatMessageRequest,
+        ChatMessageRequestMentionsItem,
+        ChatRoomRequest,
+        DEFAULT_REQUEST_OPTIONS,
+        ParticipantRequest,
+    )
+
+    BAND_SDK_AVAILABLE = True
+    BAND_IMPORT_ERROR = ""
+except ImportError as exc:
+    BAND_SDK_AVAILABLE = False
+    BAND_IMPORT_ERROR = str(exc)
 
 
 load_dotenv()
@@ -18,6 +38,7 @@ MODEL_OPTIONS = [
     "openai/gpt-4o",
     "google/gemma-3-4b-it",
 ]
+DEFAULT_BAND_REST_URL = "https://app.band.ai"
 
 DEFAULT_TELEMETRY = {
     "customer_id": "CUST_1001",
@@ -32,22 +53,290 @@ DEFAULT_TELEMETRY = {
 }
 
 
-def create_band_event(
-    step: int,
-    sender: str,
-    receiver: str,
-    event_type: str,
-    summary: str,
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    return {
-        "step": step,
-        "sender": sender,
-        "receiver": receiver,
-        "event_type": event_type,
-        "summary": summary,
-        "payload": payload,
-    }
+@dataclass
+class BandParticipant:
+    role: str
+    participant_id: str
+    display_name: str
+
+
+@dataclass
+class BandConfig:
+    enabled: bool
+    agent_id: str
+    api_key: str
+    rest_url: str
+    participants: list[BandParticipant]
+
+
+def get_secret(name: str, default: str = "") -> str:
+    return st.secrets.get(name, os.getenv(name, default))
+
+
+def inject_custom_css() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --ink: #0f172a;
+            --muted: #516078;
+            --line: rgba(26, 39, 67, 0.12);
+            --panel: rgba(255, 255, 255, 0.84);
+            --accent: #ff7a18;
+            --accent-2: #0f9bd7;
+        }
+
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(255, 122, 24, 0.18), transparent 26%),
+                radial-gradient(circle at top right, rgba(15, 155, 215, 0.16), transparent 28%),
+                linear-gradient(180deg, #f4f7fb 0%, #eef3f8 100%);
+        }
+
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+            max-width: 1220px;
+        }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #10233b 0%, #132b49 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: #f6f9fc;
+        }
+
+        [data-testid="stSidebar"] .stTextInput label,
+        [data-testid="stSidebar"] .stNumberInput label,
+        [data-testid="stSidebar"] .stSelectbox label,
+        [data-testid="stSidebar"] .stCheckbox label {
+            color: #d8e4f0;
+        }
+
+        .hero-shell {
+            background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(249,252,255,0.88) 100%);
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            padding: 1.4rem 1.5rem 1.5rem 1.5rem;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-shell::after {
+            content: "";
+            position: absolute;
+            inset: auto -80px -90px auto;
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle, rgba(255, 122, 24, 0.18), transparent 65%);
+        }
+
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-2);
+            background: rgba(15, 155, 215, 0.1);
+            border: 1px solid rgba(15, 155, 215, 0.14);
+            border-radius: 999px;
+            padding: 0.45rem 0.8rem;
+            width: fit-content;
+        }
+
+        .hero-title {
+            font-size: 3.2rem;
+            line-height: 1;
+            font-weight: 800;
+            margin: 0.95rem 0 0.7rem 0;
+            color: var(--ink);
+        }
+
+        .hero-copy {
+            color: #516078;
+            font-size: 1.02rem;
+            line-height: 1.7;
+            max-width: 54rem;
+            margin: 0;
+        }
+
+        .flow-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+            margin-top: 1.2rem;
+        }
+
+        .flow-pill {
+            border-radius: 999px;
+            padding: 0.58rem 0.92rem;
+            background: rgba(15, 23, 42, 0.04);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 0.92rem;
+        }
+
+        .status-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin-top: 0.6rem;
+        }
+
+        .status-chip {
+            border-radius: 999px;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .status-chip.ready {
+            color: #056a58;
+            background: rgba(8, 153, 129, 0.14);
+        }
+
+        .status-chip.warn {
+            color: #945300;
+            background: rgba(255, 192, 73, 0.18);
+        }
+
+        .status-chip.band {
+            color: #005b86;
+            background: rgba(15, 155, 215, 0.13);
+        }
+
+        .command-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 1.1rem 1.15rem;
+            box-shadow: 0 16px 48px rgba(15, 23, 42, 0.05);
+        }
+
+        .command-card h4 {
+            margin: 0 0 0.45rem 0;
+            color: #0f172a;
+            font-size: 1rem;
+        }
+
+        .command-card p {
+            margin: 0;
+            color: #516078;
+            line-height: 1.6;
+            font-size: 0.94rem;
+        }
+
+        [data-testid="stMetric"] {
+            background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,250,252,0.94) 100%);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 0.7rem 0.95rem;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
+        }
+
+        [data-testid="stMetricLabel"] {
+            color: #516078;
+            font-weight: 700;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 0.8rem;
+        }
+
+        .stButton > button {
+            background: linear-gradient(90deg, #ff7a18 0%, #ff9e2c 100%);
+            border: none;
+            color: white;
+            font-weight: 800;
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            box-shadow: 0 14px 30px rgba(255, 122, 24, 0.28);
+        }
+
+        .stButton > button:hover {
+            background: linear-gradient(90deg, #ef6f11 0%, #ff8f16 100%);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero(band_config: BandConfig) -> None:
+    band_status = (
+        '<span class="status-chip band">Band live sync enabled</span>'
+        if band_config.enabled
+        else '<span class="status-chip warn">Band sync optional</span>'
+    )
+    sdk_status = (
+        '<span class="status-chip ready">Band SDK ready</span>'
+        if BAND_SDK_AVAILABLE
+        else '<span class="status-chip warn">Band SDK not installed locally</span>'
+    )
+    st.markdown(
+        f"""
+        <div class="hero-shell">
+            <div class="hero-kicker">Telecom multi-agent command center</div>
+            <div class="hero-title">FlowWatch</div>
+            <p class="hero-copy">
+                Detect TV streaming degradation early, hand off context across specialist agents,
+                publish the workflow into a real Band room, and generate safe recovery guidance
+                plus customer-ready communication from one modern operations console.
+            </p>
+            <div class="flow-line">
+                <span class="flow-pill">Monitor</span>
+                <span class="flow-pill">Diagnose</span>
+                <span class="flow-pill">Recover</span>
+                <span class="flow-pill">Communicate</span>
+                <span class="flow-pill">Band sync</span>
+            </div>
+            <div class="status-chip-row">
+                <span class="status-chip ready">AI/ML API connected by key</span>
+                {sdk_status}
+                {band_status}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_overview_cards() -> None:
+    cards = st.columns(3, gap="large")
+    overview = [
+        (
+            "Proactive operations",
+            "Rules catch poor QoE before a complaint lands in customer care.",
+        ),
+        (
+            "Real Band handoffs",
+            "Each run can create a live Band room and publish agent-to-agent workflow events.",
+        ),
+        (
+            "Safe intervention",
+            "Recovery guidance stays bounded to low-risk actions that fit a hackathon demo and telecom ops reality.",
+        ),
+    ]
+    for column, (title, body) in zip(cards, overview):
+        column.markdown(
+            f"""
+            <div class="command-card">
+                <h4>{title}</h4>
+                <p>{body}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -110,11 +399,11 @@ def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
 
 
 def call_aiml_api(system_prompt: str, user_prompt: str, model_name: str) -> str:
-    api_key = st.secrets.get("AIML_API_KEY", os.getenv("AIML_API_KEY", ""))
+    api_key = get_secret("AIML_API_KEY")
     if not api_key:
         return (
-            "Error: AIML_API_KEY is missing. Add it to your .env file before running "
-            "AI-powered agents."
+            "Error: AIML_API_KEY is missing. Add it to your .env file or Streamlit secrets "
+            "before running AI-powered agents."
         )
 
     headers = {
@@ -167,9 +456,9 @@ def diagnosis_agent(
         "Diagnose the most likely root cause using only these categories: "
         "Network congestion, Wi-Fi / home network issue, Set-top box or device issue, "
         "TV streaming app issue, CDN / content delivery issue, Backend platform issue, "
-        "Unknown / needs human investigation. "
-        "Respond with concise markdown using the headings: Likely Root Cause, Why, Confidence, "
-        "Evidence Used, and Suggested Validation Checks."
+        "Unknown / needs human investigation. Respond with concise markdown using the "
+        "headings: Likely Root Cause, Why, Confidence, Evidence Used, and Suggested "
+        "Validation Checks."
     )
     user_prompt = (
         "Analyze this telemetry and QoE summary, then diagnose the most likely root cause.\n\n"
@@ -233,25 +522,304 @@ def render_agent_box(title: str, content: Any, is_json: bool = False) -> None:
             st.markdown(content)
 
 
+def create_band_event(
+    step: int,
+    sender: str,
+    receiver: str,
+    event_type: str,
+    summary: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "step": step,
+        "sender": sender,
+        "receiver": receiver,
+        "event_type": event_type,
+        "summary": summary,
+        "payload": payload,
+    }
+
+
+def build_band_config() -> BandConfig:
+    participants: list[BandParticipant] = []
+
+    with st.sidebar:
+        st.header("Band Live Layer")
+        band_enabled = st.checkbox(
+            "Enable Band room publishing",
+            value=bool(get_secret("BAND_API_KEY")),
+            help="Publish the workflow into a real Band room using the official SDK client.",
+        )
+        band_agent_id = st.text_input(
+            "Band orchestrator agent ID",
+            value=get_secret("BAND_AGENT_ID"),
+        )
+        band_api_key = st.text_input(
+            "Band orchestrator API key",
+            value=get_secret("BAND_API_KEY"),
+            type="password",
+        )
+        band_rest_url = st.text_input(
+            "Band REST URL",
+            value=get_secret("BAND_REST_URL", DEFAULT_BAND_REST_URL),
+        )
+
+        with st.expander("Optional Band participant agents"):
+            role_fields = [
+                ("Diagnosis Agent", "BAND_DIAGNOSIS_AGENT_ID", "BAND_DIAGNOSIS_AGENT_NAME"),
+                ("Recovery Action Agent", "BAND_RECOVERY_AGENT_ID", "BAND_RECOVERY_AGENT_NAME"),
+                ("Customer Care Agent", "BAND_CUSTOMER_AGENT_ID", "BAND_CUSTOMER_AGENT_NAME"),
+            ]
+            for role, id_key, name_key in role_fields:
+                participant_id = st.text_input(role + " participant ID", value=get_secret(id_key))
+                display_name = st.text_input(
+                    role + " display name",
+                    value=get_secret(name_key, role),
+                )
+                if participant_id:
+                    participants.append(
+                        BandParticipant(
+                            role=role,
+                            participant_id=participant_id,
+                            display_name=display_name or role,
+                        )
+                    )
+
+        if band_enabled and not BAND_SDK_AVAILABLE:
+            st.warning(
+                "Band SDK package is not installed in this environment yet. "
+                "Add `band-sdk` to requirements before expecting live room publishing."
+            )
+
+    return BandConfig(
+        enabled=band_enabled,
+        agent_id=band_agent_id,
+        api_key=band_api_key,
+        rest_url=band_rest_url,
+        participants=participants,
+    )
+
+
+async def publish_workflow_to_band(
+    band_config: BandConfig,
+    telemetry: dict[str, Any],
+    qoe_result: dict[str, Any],
+    diagnosis_text: str | None,
+    recovery_text: str | None,
+    customer_care_text: str | None,
+    model_name: str,
+) -> dict[str, Any]:
+    if not band_config.enabled:
+        return {"published": False, "reason": "Band publishing disabled"}
+    if not BAND_SDK_AVAILABLE:
+        return {
+            "published": False,
+            "error": f"Band SDK unavailable in runtime: {BAND_IMPORT_ERROR}",
+        }
+    if not band_config.api_key:
+        return {"published": False, "error": "Missing BAND_API_KEY"}
+
+    client = AsyncRestClient(
+        api_key=band_config.api_key,
+        base_url=band_config.rest_url.rstrip("/"),
+    )
+    task_id = f"flowwatch-{telemetry['customer_id'].lower()}"
+    room_response = await client.agent_api_chats.create_agent_chat(
+        chat=ChatRoomRequest(task_id=task_id),
+        request_options=DEFAULT_REQUEST_OPTIONS,
+    )
+    room_id = room_response.data.id
+
+    added_participants: list[str] = []
+    for participant in band_config.participants:
+        await client.agent_api_participants.add_agent_chat_participant(
+            chat_id=room_id,
+            participant=ParticipantRequest(participant_id=participant.participant_id),
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+        added_participants.append(participant.display_name)
+
+    await client.agent_api_events.create_agent_chat_event(
+        chat_id=room_id,
+        event=ChatEventRequest(
+            content="FlowWatch started a proactive QoE investigation.",
+            message_type="task",
+            metadata={
+                "customer_id": telemetry["customer_id"],
+                "service": telemetry["service"],
+                "orchestrator_agent_id": band_config.agent_id or "not_provided",
+                "model_name": model_name,
+            },
+        ),
+        request_options=DEFAULT_REQUEST_OPTIONS,
+    )
+
+    await client.agent_api_events.create_agent_chat_event(
+        chat_id=room_id,
+        event=ChatEventRequest(
+            content=f"QoE monitoring classified the session as {qoe_result['qoe_status']}.",
+            message_type="thought",
+            metadata=qoe_result,
+        ),
+        request_options=DEFAULT_REQUEST_OPTIONS,
+    )
+
+    if diagnosis_text:
+        await client.agent_api_events.create_agent_chat_event(
+            chat_id=room_id,
+            event=ChatEventRequest(
+                content="Diagnosis completed and published to the room.",
+                message_type="task",
+                metadata={"diagnosis": diagnosis_text},
+            ),
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+
+    if recovery_text:
+        await client.agent_api_events.create_agent_chat_event(
+            chat_id=room_id,
+            event=ChatEventRequest(
+                content="Recovery plan completed and published to the room.",
+                message_type="task",
+                metadata={"recovery_plan": recovery_text},
+            ),
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+
+    if customer_care_text:
+        await client.agent_api_events.create_agent_chat_event(
+            chat_id=room_id,
+            event=ChatEventRequest(
+                content="Customer care communication package completed.",
+                message_type="task",
+                metadata={"customer_care": customer_care_text},
+            ),
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+
+    published_messages = 0
+    role_messages = [
+        (
+            "Diagnosis Agent",
+            dedent(
+                f"""
+                Please review this streaming session and assess likely root cause.
+
+                Customer: {telemetry['customer_id']}
+                QoE status: {qoe_result['qoe_status']}
+                Evidence: {', '.join(qoe_result['key_evidence']) or 'No threshold breach evidence'}
+                """
+            ).strip(),
+        ),
+        (
+            "Recovery Action Agent",
+            dedent(
+                f"""
+                Please review the current diagnosis and publish safe remediation actions.
+
+                Diagnosis:
+                {diagnosis_text or 'Not available'}
+                """
+            ).strip(),
+        ),
+        (
+            "Customer Care Agent",
+            dedent(
+                f"""
+                Please prepare customer-friendly outreach and an internal support note.
+
+                Recovery plan:
+                {recovery_text or 'Not available'}
+                """
+            ).strip(),
+        ),
+    ]
+
+    for role, message in role_messages:
+        participant = next((item for item in band_config.participants if item.role == role), None)
+        if participant is None:
+            continue
+        await client.agent_api_messages.create_agent_chat_message(
+            chat_id=room_id,
+            message=ChatMessageRequest(
+                content=message,
+                mentions=[
+                    ChatMessageRequestMentionsItem(
+                        id=participant.participant_id,
+                        name=participant.display_name,
+                    )
+                ],
+            ),
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+        published_messages += 1
+
+    return {
+        "published": True,
+        "room_id": room_id,
+        "task_id": task_id,
+        "participants_added": added_participants,
+        "participant_messages_sent": published_messages,
+        "rest_url": band_config.rest_url,
+    }
+
+
+def run_band_publish(
+    band_config: BandConfig,
+    telemetry: dict[str, Any],
+    qoe_result: dict[str, Any],
+    diagnosis_text: str | None,
+    recovery_text: str | None,
+    customer_care_text: str | None,
+    model_name: str,
+) -> dict[str, Any]:
+    try:
+        return asyncio.run(
+            publish_workflow_to_band(
+                band_config,
+                telemetry,
+                qoe_result,
+                diagnosis_text,
+                recovery_text,
+                customer_care_text,
+                model_name,
+            )
+        )
+    except Exception as exc:
+        return {"published": False, "error": str(exc)}
+
+
 def render_band_room(
     room_id: str,
     shared_context: dict[str, Any],
     communication_log: list[dict[str, Any]],
+    band_result: dict[str, Any] | None,
 ) -> None:
     with st.container(border=True):
-        st.subheader("Band Room Communication Layer")
+        st.subheader("Band Communication Layer")
         st.write(
-            "FlowWatch uses Band as the agent communication layer: each specialist agent "
-            "publishes updates into a shared room, reads prior context, and hands the task "
-            "to the next agent with structured payloads."
+            "FlowWatch uses Band as the agent communication fabric. Each run can publish "
+            "structured workflow updates into a real Band room, while the trace below shows "
+            "what was shared between specialists."
         )
-        st.caption(f"Band room: `{room_id}`")
 
+        live_note = "Live Band publishing was skipped for this run."
+        if band_result and band_result.get("published"):
+            live_note = (
+                f"Live Band room created successfully. Room ID: `{band_result['room_id']}`"
+            )
+        elif band_result and band_result.get("error"):
+            live_note = f"Band publish failed: {band_result['error']}"
+
+        st.caption(live_note)
         room_col, log_col = st.columns([1, 1.35], gap="large")
 
         with room_col:
             st.markdown("**Shared room context**")
             st.json(shared_context)
+            if band_result:
+                st.markdown("**Band publish result**")
+                st.json(band_result)
 
         with log_col:
             st.markdown("**Agent handoff trace**")
@@ -261,7 +829,7 @@ def render_band_room(
                         f"**Step {event['step']} · {event['sender']} -> {event['receiver']}**"
                     )
                     st.caption(f"{event['event_type']} | {event['summary']}")
-                    with st.expander("Band payload"):
+                    with st.expander("Shared payload"):
                         st.json(event["payload"])
 
 
@@ -274,7 +842,7 @@ def render_hackathon_alignment() -> None:
         },
         {
             "Hackathon Area": "Band usage",
-            "How FlowWatch addresses it": "Band is showcased as the communication layer where agents share room context, publish handoffs, and coordinate next actions.",
+            "How FlowWatch addresses it": "Band is now used as the live communication layer to publish room context, handoffs, and optional agent participant coordination.",
         },
         {
             "Hackathon Area": "AI/ML API usage",
@@ -286,7 +854,7 @@ def render_hackathon_alignment() -> None:
         },
         {
             "Hackathon Area": "Demo app",
-            "How FlowWatch addresses it": "Streamlit provides a fast, presentation-ready prototype with adjustable telemetry and visible agent outputs.",
+            "How FlowWatch addresses it": "The Streamlit UI behaves like a modern operations command center with editable telemetry and visible Band collaboration proof.",
         },
     ]
     st.table(alignment_rows)
@@ -294,21 +862,17 @@ def render_hackathon_alignment() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="FlowWatch", page_icon="📺", layout="wide")
-
-    st.title("📺 FlowWatch")
-    st.caption("AI multi-agent proactive QoE monitoring for TV streaming")
-    st.write("**Workflow:** Monitor -> Diagnose -> Recover -> Communicate")
+    inject_custom_css()
+    band_config = build_band_config()
 
     with st.sidebar:
-        st.header("Configuration")
+        st.header("Model & Telemetry")
         selected_model = st.selectbox(
             "AI/ML model",
             MODEL_OPTIONS,
             index=MODEL_OPTIONS.index(DEFAULT_MODEL),
             help="Switch models if one provider route is temporarily unavailable.",
         )
-
-        st.header("Telemetry Simulator")
         telemetry = {
             "customer_id": st.text_input(
                 "Customer ID", value=DEFAULT_TELEMETRY["customer_id"]
@@ -356,6 +920,11 @@ def main() -> None:
             ),
         }
 
+    render_hero(band_config)
+    st.write("")
+    render_overview_cards()
+    st.write("")
+
     metrics = st.columns(5)
     metrics[0].metric("QoE Score", telemetry["qoe_score"])
     metrics[1].metric("Bitrate", f"{telemetry['bitrate_mbps']} Mbps")
@@ -366,13 +935,26 @@ def main() -> None:
     with st.expander("Raw telemetry JSON"):
         st.json(telemetry)
 
-    with st.container(border=True):
-        st.subheader("Band Collaboration Context")
-        st.write(
-            "Band is the communication layer in the FlowWatch story. Agents publish room "
-            "messages, share context, and hand off tasks through a Band room, while this "
-            "Streamlit app provides the stable product demo powered by AI/ML API."
-        )
+    readiness_col, band_col = st.columns([1.15, 0.85], gap="large")
+    with readiness_col:
+        with st.container(border=True):
+            st.markdown('<div class="section-title">Workflow Control</div>', unsafe_allow_html=True)
+            st.write(
+                "Run the full pipeline below. FlowWatch first applies deterministic QoE rules, "
+                "then escalates to AI-powered diagnosis, recovery, and communication only when "
+                "customer impact is likely."
+            )
+    with band_col:
+        with st.container(border=True):
+            st.markdown('<div class="section-title">Band Mode</div>', unsafe_allow_html=True)
+            if band_config.enabled and BAND_SDK_AVAILABLE and band_config.api_key:
+                st.success("Band live room publishing is armed for this run.")
+            elif band_config.enabled and not BAND_SDK_AVAILABLE:
+                st.warning("Band publishing is enabled, but the SDK package is not available in this runtime.")
+            elif band_config.enabled and not band_config.api_key:
+                st.warning("Band publishing is enabled, but BAND_API_KEY is missing.")
+            else:
+                st.info("Band sync is optional. Enable it in the sidebar to publish the workflow into a real Band room.")
 
     if st.button(
         "🚀 Run FlowWatch Multi-Agent Analysis",
@@ -381,6 +963,7 @@ def main() -> None:
     ):
         room_id = f"band-room-{telemetry['customer_id'].lower()}"
         communication_log: list[dict[str, Any]] = []
+        band_result: dict[str, Any] | None = None
 
         qoe_result = qoe_monitoring_agent(telemetry)
         communication_log.append(
@@ -404,14 +987,23 @@ def main() -> None:
                 "latest_status": qoe_result["qoe_status"],
                 "next_action": "Continue passive monitoring",
             }
-            render_band_room(room_id, shared_context, communication_log)
+            band_result = run_band_publish(
+                band_config,
+                telemetry,
+                qoe_result,
+                diagnosis_text=None,
+                recovery_text=None,
+                customer_care_text=None,
+                model_name=selected_model,
+            )
+            render_band_room(room_id, shared_context, communication_log, band_result)
             st.success(
                 "QoE looks healthy. FlowWatch stopped after monitoring because no further action is required."
             )
             render_hackathon_alignment()
             return
 
-        with st.spinner("Running diagnosis, recovery, and customer care agents..."):
+        with st.spinner("Running diagnosis, recovery, customer care, and Band sync..."):
             diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
             communication_log.append(
                 create_band_event(
@@ -419,7 +1011,7 @@ def main() -> None:
                     sender="Diagnosis Agent",
                     receiver="Recovery Action Agent",
                     event_type="handoff",
-                    summary="Published root cause assessment to the shared Band room.",
+                    summary="Published root cause assessment to the shared collaboration layer.",
                     payload={
                         "diagnosis_summary": diagnosis_text,
                         "customer_id": telemetry["customer_id"],
@@ -427,6 +1019,7 @@ def main() -> None:
                     },
                 )
             )
+
             recovery_text = recovery_action_agent(
                 telemetry, diagnosis_text, selected_model
             )
@@ -444,6 +1037,7 @@ def main() -> None:
                     },
                 )
             )
+
             customer_care_text = customer_care_agent(
                 telemetry, diagnosis_text, recovery_text, selected_model
             )
@@ -460,6 +1054,16 @@ def main() -> None:
                         "service": telemetry["service"],
                     },
                 )
+            )
+
+            band_result = run_band_publish(
+                band_config,
+                telemetry,
+                qoe_result,
+                diagnosis_text,
+                recovery_text,
+                customer_care_text,
+                selected_model,
             )
 
         render_agent_box("2. Diagnosis Agent", diagnosis_text)
@@ -481,9 +1085,11 @@ def main() -> None:
             "selected_model": selected_model,
             "next_action": "Proactive outreach and continued monitoring",
         }
-        render_band_room(room_id, shared_context, communication_log)
+        render_band_room(room_id, shared_context, communication_log, band_result)
         render_hackathon_alignment()
-        st.success("FlowWatch analysis complete. The multi-agent workflow is ready for demo.")
+        st.success(
+            "FlowWatch analysis complete. The multi-agent workflow and Band communication layer are ready for demo."
+        )
 
 
 if __name__ == "__main__":
