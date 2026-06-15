@@ -92,7 +92,7 @@ def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
 
 
 def call_aiml_api(system_prompt: str, user_prompt: str, model_name: str) -> str:
-    api_key = os.getenv("AIML_API_KEY")
+    api_key = st.secrets.get("AIML_API_KEY", os.getenv("AIML_API_KEY", ""))
     if not api_key:
         return (
             "Error: AIML_API_KEY is missing. Add it to your .env file before running "
