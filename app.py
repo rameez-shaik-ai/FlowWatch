@@ -90,11 +90,33 @@ def inject_custom_css() -> None:
             --glow: rgba(30, 199, 192, 0.22);
         }
 
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --ink: #ecf4ff;
+                --muted: #c1d2ea;
+                --line: rgba(124, 166, 214, 0.18);
+                --panel: rgba(12, 28, 52, 0.92);
+                --accent: #38d7d0;
+                --accent-2: #5ba2ff;
+                --accent-3: #d9ebff;
+                --glow: rgba(56, 215, 208, 0.18);
+            }
+        }
+
         .stApp {
             background:
                 radial-gradient(circle at top left, rgba(30, 199, 192, 0.18), transparent 28%),
                 radial-gradient(circle at top right, rgba(13, 92, 171, 0.16), transparent 30%),
                 linear-gradient(180deg, #f4f8fd 0%, #edf4fb 100%);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .stApp {
+                background:
+                    radial-gradient(circle at top left, rgba(56, 215, 208, 0.14), transparent 28%),
+                    radial-gradient(circle at top right, rgba(91, 162, 255, 0.12), transparent 30%),
+                    linear-gradient(180deg, #07111f 0%, #0a172a 100%);
+            }
         }
 
         .block-container {
@@ -127,6 +149,19 @@ def inject_custom_css() -> None:
             box-shadow: 0 24px 80px rgba(8, 34, 74, 0.09);
             position: relative;
             overflow: hidden;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .hero-shell,
+            .command-card,
+            .agent-card,
+            [data-testid="stMetric"],
+            [data-testid="stExpander"],
+            [data-testid="stHorizontalBlock"] > div > [data-testid="stVerticalBlock"] > div[data-testid="stContainer"] {
+                background: linear-gradient(180deg, rgba(14, 30, 55, 0.96) 0%, rgba(10, 24, 44, 0.94) 100%) !important;
+                border-color: var(--line) !important;
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.26) !important;
+            }
         }
 
         .hero-shell::after {
@@ -245,7 +280,7 @@ def inject_custom_css() -> None:
             box-shadow: 0 18px 40px rgba(8, 34, 74, 0.06);
             position: relative;
             overflow: hidden;
-            min-height: 152px;
+            min-height: 168px;
         }
 
         .agent-card::before {
@@ -273,8 +308,7 @@ def inject_custom_css() -> None:
 
         .agent-head {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.75rem;
             margin-bottom: 0.7rem;
         }
@@ -293,19 +327,23 @@ def inject_custom_css() -> None:
 
         .agent-state {
             min-width: 0;
+            flex: 1;
         }
 
         .agent-name {
-            font-size: 0.98rem;
+            font-size: 0.9rem;
             font-weight: 800;
             color: var(--ink);
             margin: 0;
+            line-height: 1.35;
+            word-break: normal;
         }
 
         .agent-role {
             margin: 0.18rem 0 0 0;
             color: var(--muted);
-            font-size: 0.86rem;
+            font-size: 0.82rem;
+            line-height: 1.45;
         }
 
         .agent-badge {
@@ -377,6 +415,39 @@ def inject_custom_css() -> None:
         .kpi-pill span {
             font-size: 0.8rem;
             color: #3f5e82;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .kpi-pill {
+                background: rgba(91, 162, 255, 0.12);
+                border-color: rgba(91, 162, 255, 0.18);
+            }
+
+            .kpi-pill span,
+            .agent-role,
+            .command-card p,
+            [data-testid="stMetricLabel"],
+            .stCaption,
+            .stMarkdown p,
+            .stText,
+            .stWrite {
+                color: var(--muted) !important;
+            }
+
+            .agent-name,
+            .command-card h4,
+            .section-title,
+            .hero-title,
+            [data-testid="stMetricValue"] {
+                color: var(--ink) !important;
+            }
+
+            .flow-pill,
+            .hero-kicker,
+            .status-chip,
+            .agent-badge {
+                color: var(--ink);
+            }
         }
 
         @keyframes agentPulse {
@@ -521,7 +592,6 @@ def render_architecture_diagram() -> None:
         else:
             st.info("Architecture diagram asset not found.")
 
-
 def render_agent_orchestration_board(
     agent_states: dict[str, str], band_config: BandConfig
 ) -> None:
@@ -557,36 +627,36 @@ def render_agent_orchestration_board(
                 unsafe_allow_html=True,
             )
 
-        columns = st.columns(4, gap="large")
-        for column, (name, role, icon) in zip(columns, agent_specs):
-            state = agent_states.get(name, "waiting")
-            label = {
-                "active": "Running",
-                "done": "Complete",
-                "waiting": "Standby",
-            }.get(state, "Standby")
-            with column:
-                st.markdown(
-                    f"""
-                    <div class="agent-card {state}">
-                        <div class="agent-head">
-                            <div style="display:flex; gap:0.8rem; align-items:center;">
+        for row_start in range(0, len(agent_specs), 2):
+            columns = st.columns(2, gap="large")
+            row_agents = agent_specs[row_start : row_start + 2]
+            for column, (name, role, icon) in zip(columns, row_agents):
+                state = agent_states.get(name, "waiting")
+                label = {
+                    "active": "Running",
+                    "done": "Complete",
+                    "waiting": "Standby",
+                }.get(state, "Standby")
+                with column:
+                    st.markdown(
+                        f"""
+                        <div class="agent-card {state}">
+                            <div class="agent-head">
                                 <div class="agent-icon">{icon}</div>
                                 <div class="agent-state">
                                     <p class="agent-name">{name}</p>
                                     <p class="agent-role">{role}</p>
                                 </div>
                             </div>
-                            <span class="agent-badge {state}">{label}</span>
+                            <div class="agent-meta">
+                                <span class="agent-badge {state}">{label}</span>
+                                <span class="agent-led {state}"></span>
+                            </div>
+                            <div style="margin-top:0.75rem; font-size:0.82rem; color:#3f5e82;">Core specialist</div>
                         </div>
-                        <div class="agent-meta">
-                            <span style="font-size:0.82rem; color:#3f5e82;">Core specialist</span>
-                            <span class="agent-led {state}"></span>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
 
 def qoe_monitoring_agent(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -1195,8 +1265,6 @@ def main() -> None:
 
     with st.expander("Raw telemetry JSON"):
         st.json(telemetry)
-
-    render_architecture_diagram()
 
     readiness_col, band_col = st.columns([1.15, 0.85], gap="large")
     with readiness_col:
