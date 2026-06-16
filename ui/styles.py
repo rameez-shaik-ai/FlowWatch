@@ -257,24 +257,26 @@ html, body, [class*="css"] {
 .workflow-stepper {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.75rem;
     width: 100%;
     flex-wrap: nowrap;
     margin-top: auto;
+    overflow: hidden;
 }
 
 .workflow-step {
     display: flex;
     align-items: center;
-    flex: 1;
+    flex: 1 1 0;
+    width: 0;
     min-width: 0;
-    min-width: 120px;
     border: 1px solid rgba(74, 222, 128, 0.22);
     border-radius: 16px;
-    padding: 0.85rem 0.9rem;
+    padding: 0.78rem 0.82rem;
     background: rgba(14, 31, 22, 0.82);
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .workflow-step-inner {
@@ -282,6 +284,7 @@ html, body, [class*="css"] {
     align-items: center;
     gap: 0.65rem;
     min-width: 0;
+    width: 100%;
 }
 
 .workflow-icon {
@@ -305,18 +308,23 @@ html, body, [class*="css"] {
 
 .workflow-label {
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 800;
     white-space: nowrap;
     word-break: keep-all;
     overflow-wrap: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
 .workflow-status {
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     margin-top: 0.2rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .workflow-step.waiting {
@@ -345,12 +353,13 @@ html, body, [class*="css"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 36px;
+    min-width: 22px;
     color: var(--primary);
     opacity: 0.45;
-    font-size: 1.4rem;
-    flex: 0 0 36px;
+    font-size: 1.1rem;
+    flex: 0 0 22px;
     align-self: center;
+    overflow: hidden;
 }
 
 .flow-connector.active {
@@ -540,6 +549,22 @@ html, body, [class*="css"] {
 
 [data-testid="column"] > div {
     height: 100%;
+}
+
+@media (max-width: 1450px) {
+    .workflow-stepper {
+        flex-wrap: wrap;
+    }
+
+    .flow-connector {
+        display: none;
+    }
+
+    .workflow-step {
+        flex: 1 1 calc(50% - 0.4rem);
+        width: auto;
+        min-width: 220px;
+    }
 }
 
 @media (max-width: 980px) {
