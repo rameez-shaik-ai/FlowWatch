@@ -453,6 +453,46 @@ html, body, [class*="css"] {
     gap: 1rem;
 }
 
+.impact-gate-card {
+    min-height: 470px;
+    gap: 0.85rem;
+}
+
+.impact-qoe-row {
+    display: grid;
+    grid-template-columns: 1.25fr 0.75fr;
+    gap: 0.75rem;
+}
+
+.impact-qoe-block {
+    padding: 0.8rem 0.85rem;
+    border-radius: 16px;
+    background: rgba(34, 197, 94, 0.05);
+    border: 1px solid rgba(74, 222, 128, 0.14);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.impact-qoe-block span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.impact-qoe-block strong {
+    color: var(--text);
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 800;
+}
+
+.impact-meta-block strong {
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
 .mapped-qoe-row {
     display: flex;
     gap: 0.85rem;
@@ -532,7 +572,7 @@ html, body, [class*="css"] {
 
 .impact-gate-copy {
     display: grid;
-    grid-template-columns: 0.55fr 1.45fr;
+    grid-template-columns: 1.35fr 0.65fr;
     gap: 0.65rem;
     margin-bottom: 0.75rem;
 }
@@ -753,10 +793,10 @@ html, body, [class*="css"] {
 }
 
 @media (max-width: 980px) {
-    .mapped-grid {
+    .mapped-grid,
+    .impact-qoe-row {
         grid-template-columns: 1fr;
     }
-
     .impact-gate-copy,
     .impact-gate-grid {
         grid-template-columns: 1fr;

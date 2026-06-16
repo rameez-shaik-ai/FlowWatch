@@ -97,6 +97,7 @@ def render_top_summary_cards(
     workflow_state: dict[str, str],
     band_config: BandConfig,
     action_summary: dict[str, str] | None = None,
+    show_incident_card: bool = True,
 ) -> None:
     qoe_status = qoe_preview["qoe_status"].lower()
     status_tone = {
@@ -111,24 +112,29 @@ def render_top_summary_cards(
         "band": "Enabled" if band_config.enabled else "Disabled",
     }
 
-    cols = st.columns([0.95, 2.05], gap="large")
-    cols[0].markdown(
-        f"""
-        <div class="summary-card incident-card {qoe_status}">
-            <p class="summary-eyebrow">Incident Health</p>
-            <div class="incident-score">{telemetry['qoe_score']}</div>
-            <div class="incident-status-row">
-                {render_status_chip(qoe_preview['qoe_status'], status_tone)}
+    if show_incident_card:
+        cols = st.columns([0.95, 2.05], gap="large")
+        cols[0].markdown(
+            f"""
+            <div class="summary-card incident-card {qoe_status}">
+                <p class="summary-eyebrow">Incident Health</p>
+                <div class="incident-score">{telemetry['qoe_score']}</div>
+                <div class="incident-status-row">
+                    {render_status_chip(qoe_preview['qoe_status'], status_tone)}
+                </div>
+                <div class="incident-meta">
+                    <span>{telemetry['customer_id']}</span>
+                    <span>{telemetry['service']}</span>
+                </div>
             </div>
-            <div class="incident-meta">
-                <span>{telemetry['customer_id']}</span>
-                <span>{telemetry['service']}</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    cols[1].markdown(
+            """,
+            unsafe_allow_html=True,
+        )
+        workflow_column = cols[1]
+    else:
+        workflow_column = st.container()
+
+    workflow_column.markdown(
         f"""
         <div class="summary-card workflow-card">
             <div class="workflow-topline">
@@ -233,13 +239,6 @@ def render_embedded_player_panel(
         "Warning": "warning",
         "Poor": "critical",
     }.get(qoe_status, "neutral")
-    next_action = (
-        "Auto-analysis armed"
-        if auto_run_enabled and qoe_status in {"Poor", "Warning"}
-        else "Monitoring embedded player telemetry"
-        if qoe_status == "Good"
-        else "Run FlowWatch analysis"
-    )
     impact = playback_impact or {}
     impact_status = impact.get("impact_status", "Unknown")
     impact_tone = {
@@ -285,48 +284,42 @@ def render_embedded_player_panel(
     with right:
         st.markdown(
             f"""
-            <div class="summary-card mapped-telemetry-card">
-                <p class="summary-eyebrow">Mapped FlowWatch Telemetry</p>
-                <div class="mapped-qoe-row">
-                    <div class="mapped-score">{int(telemetry['qoe_score'])}</div>
-                    <div class="mapped-qoe-copy">
+            <div class="summary-card impact-gate-card">
+                <div class="impact-gate-head">
+                    <p class="summary-eyebrow">Playback Impact Gate</p>
+                    {render_status_chip(impact_status, impact_tone)}
+                </div>
+                <div class="impact-qoe-row">
+                    <div class="impact-qoe-block">
+                        <span>QoE</span>
+                        <strong>{int(telemetry['qoe_score'])}</strong>
                         {render_status_chip(qoe_status, qoe_tone)}
-                        <p class="mapped-next-action">{escape(next_action)}</p>
+                    </div>
+                    <div class="impact-qoe-block impact-meta-block">
+                        <span>Last refresh</span>
+                        <strong>{escape(refresh_label)}</strong>
                     </div>
                 </div>
-                <div class="mapped-grid">
-                    <div><span>Customer</span><strong>{escape(str(telemetry['customer_id']))}</strong></div>
-                    <div><span>Device</span><strong>{escape(str(telemetry['device_id']))}</strong></div>
-                    <div><span>Service</span><strong>{escape(str(telemetry['service']))}</strong></div>
-                    <div><span>Last refresh</span><strong>{escape(refresh_label)}</strong></div>
-                    <div><span>Bitrate</span><strong>{float(telemetry['bitrate_mbps']):.1f} Mbps</strong></div>
-                    <div><span>Buffering</span><strong>{float(telemetry['buffering_ratio']):.1f}%</strong></div>
-                    <div><span>Latency</span><strong>{int(telemetry['latency_ms'])} ms</strong></div>
-                    <div><span>Packet loss</span><strong>{float(telemetry['packet_loss']):.1f}%</strong></div>
+                <div class="impact-gate-copy">
+                    <div><span>Decision</span><strong>{escape(str(impact.get('decision', 'Monitoring embedded playback impact.')))}</strong></div>
+                    <div><span>Impact score</span><strong>{int(impact.get('impact_score', 0))}</strong></div>
                 </div>
-                <div class="impact-gate-panel">
-                    <div class="impact-gate-head">
-                        <p class="summary-eyebrow">Playback Impact Gate</p>
-                        {render_status_chip(impact_status, impact_tone)}
-                    </div>
-                    <div class="impact-gate-copy">
-                        <div><span>Impact score</span><strong>{int(impact.get('impact_score', 0))}</strong></div>
-                        <div><span>Decision</span><strong>{escape(str(impact.get('decision', 'Monitoring embedded playback impact.')))}</strong></div>
-                    </div>
-                    <div class="impact-gate-grid">
-                        <div><span>Buffered ahead</span><strong>{float(telemetry.get('buffered_ahead_seconds', 0.0)):.1f}s</strong></div>
-                        <div><span>Player state</span><strong>{escape(str(telemetry.get('player_state', '-')))}</strong></div>
-                        <div><span>Dropped-frame ratio</span><strong>{dropped_frame_ratio:.1f}%</strong></div>
-                        <div><span>Stall count</span><strong>{int(telemetry.get('stall_count', 0))}</strong></div>
-                        <div><span>Resolution</span><strong>{escape(str(telemetry.get('resolution', '-')))}</strong></div>
-                        <div><span>Playback moving</span><strong>{'Yes' if telemetry.get('playback_time_moving') else 'No'}</strong></div>
-                    </div>
-                    {f"<ul class='impact-reasons'>{''.join(f'<li>{escape(str(reason))}</li>' for reason in impact_reasons)}</ul>" if impact_reasons else ""}
+                <div class="impact-gate-grid">
+                    <div><span>Buffered ahead</span><strong>{float(telemetry.get('buffered_ahead_seconds', 0.0)):.1f}s</strong></div>
+                    <div><span>Player state</span><strong>{escape(str(telemetry.get('player_state', '-')))}</strong></div>
+                    <div><span>Dropped-frame ratio</span><strong>{dropped_frame_ratio:.1f}%</strong></div>
+                    <div><span>Stall count</span><strong>{int(telemetry.get('stall_count', 0))}</strong></div>
+                    <div><span>Resolution</span><strong>{escape(str(telemetry.get('resolution', '-')))}</strong></div>
+                    <div><span>Playback moving</span><strong>{'Yes' if telemetry.get('playback_time_moving') else 'No'}</strong></div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        if impact_reasons:
+            with st.expander("Why this decision?"):
+                for reason in impact_reasons:
+                    st.markdown(f"- {reason}")
 
 
 def render_results_tabs(

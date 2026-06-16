@@ -175,56 +175,115 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
                 "player_scenario": st.session_state.player_scenario,
                 "player_auto_run_enabled": st.session_state.player_auto_run_enabled,
             }
-
-        st.markdown("### Telemetry Fields")
         telemetry_defaults = st.session_state.telemetry_values
         telemetry_disabled = st.session_state.telemetry_source_mode == "Embedded HLS player"
-        telemetry = {
-            "customer_id": st.text_input(
-                "Customer ID", value=telemetry_defaults["customer_id"], disabled=telemetry_disabled
-            ),
-            "device_id": st.text_input(
-                "Device ID", value=telemetry_defaults["device_id"], disabled=telemetry_disabled
-            ),
-            "service": st.text_input(
-                "Service", value=telemetry_defaults["service"], disabled=telemetry_disabled
-            ),
-            "bitrate_mbps": st.number_input(
-                "Bitrate Mbps",
-                min_value=0.0,
-                value=float(telemetry_defaults["bitrate_mbps"]),
-                step=0.1,
-                disabled=telemetry_disabled,
-            ),
-            "buffering_ratio": st.number_input(
-                "Buffering ratio %",
-                min_value=0.0,
-                value=float(telemetry_defaults["buffering_ratio"]),
-                step=0.1,
-                disabled=telemetry_disabled,
-            ),
-            "latency_ms": st.number_input(
-                "Latency ms",
-                min_value=0,
-                value=int(telemetry_defaults["latency_ms"]),
-                step=1,
-                disabled=telemetry_disabled,
-            ),
-            "packet_loss": st.number_input(
-                "Packet loss %",
-                min_value=0.0,
-                value=float(telemetry_defaults["packet_loss"]),
-                step=0.1,
-                disabled=telemetry_disabled,
-            ),
-            "app_crashes": st.number_input(
-                "App crashes",
-                min_value=0,
-                value=int(telemetry_defaults["app_crashes"]),
-                step=1,
-                disabled=telemetry_disabled,
-            ),
-        }
+        if st.session_state.telemetry_source_mode == "Embedded HLS player":
+            telemetry = {
+                "customer_id": telemetry_defaults["customer_id"],
+                "device_id": telemetry_defaults["device_id"],
+                "service": telemetry_defaults["service"],
+                "bitrate_mbps": float(telemetry_defaults["bitrate_mbps"]),
+                "buffering_ratio": float(telemetry_defaults["buffering_ratio"]),
+                "latency_ms": int(telemetry_defaults["latency_ms"]),
+                "packet_loss": float(telemetry_defaults["packet_loss"]),
+                "app_crashes": int(telemetry_defaults["app_crashes"]),
+            }
+            with st.expander("Mapped telemetry fields", expanded=False):
+                st.text_input("Customer ID", value=telemetry_defaults["customer_id"], disabled=True)
+                st.text_input("Device ID", value=telemetry_defaults["device_id"], disabled=True)
+                st.text_input("Service", value=telemetry_defaults["service"], disabled=True)
+                st.number_input(
+                    "Bitrate Mbps",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["bitrate_mbps"]),
+                    step=0.1,
+                    disabled=True,
+                )
+                st.number_input(
+                    "Buffering ratio %",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["buffering_ratio"]),
+                    step=0.1,
+                    disabled=True,
+                )
+                st.number_input(
+                    "Latency ms",
+                    min_value=0,
+                    value=int(telemetry_defaults["latency_ms"]),
+                    step=1,
+                    disabled=True,
+                )
+                st.number_input(
+                    "Packet loss %",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["packet_loss"]),
+                    step=0.1,
+                    disabled=True,
+                )
+                st.number_input(
+                    "App crashes",
+                    min_value=0,
+                    value=int(telemetry_defaults["app_crashes"]),
+                    step=1,
+                    disabled=True,
+                )
+                st.number_input(
+                    "QoE score",
+                    min_value=0,
+                    max_value=100,
+                    value=int(telemetry_defaults["qoe_score"]),
+                    step=1,
+                    disabled=True,
+                    help="Mapped from the embedded player telemetry scenario for this prototype.",
+                )
+        else:
+            st.markdown("### Telemetry Fields")
+            telemetry = {
+                "customer_id": st.text_input(
+                    "Customer ID", value=telemetry_defaults["customer_id"], disabled=telemetry_disabled
+                ),
+                "device_id": st.text_input(
+                    "Device ID", value=telemetry_defaults["device_id"], disabled=telemetry_disabled
+                ),
+                "service": st.text_input(
+                    "Service", value=telemetry_defaults["service"], disabled=telemetry_disabled
+                ),
+                "bitrate_mbps": st.number_input(
+                    "Bitrate Mbps",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["bitrate_mbps"]),
+                    step=0.1,
+                    disabled=telemetry_disabled,
+                ),
+                "buffering_ratio": st.number_input(
+                    "Buffering ratio %",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["buffering_ratio"]),
+                    step=0.1,
+                    disabled=telemetry_disabled,
+                ),
+                "latency_ms": st.number_input(
+                    "Latency ms",
+                    min_value=0,
+                    value=int(telemetry_defaults["latency_ms"]),
+                    step=1,
+                    disabled=telemetry_disabled,
+                ),
+                "packet_loss": st.number_input(
+                    "Packet loss %",
+                    min_value=0.0,
+                    value=float(telemetry_defaults["packet_loss"]),
+                    step=0.1,
+                    disabled=telemetry_disabled,
+                ),
+                "app_crashes": st.number_input(
+                    "App crashes",
+                    min_value=0,
+                    value=int(telemetry_defaults["app_crashes"]),
+                    step=1,
+                    disabled=telemetry_disabled,
+                ),
+            }
 
         if st.session_state.telemetry_source_mode == "Embedded HLS player":
             telemetry.update(
@@ -261,15 +320,6 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             )
         elif st.session_state.telemetry_source_mode == "Embedded HLS player":
             telemetry["qoe_score"] = int(telemetry_defaults["qoe_score"])
-            st.number_input(
-                "QoE score",
-                min_value=0,
-                max_value=100,
-                value=int(telemetry["qoe_score"]),
-                step=1,
-                disabled=True,
-                help="Mapped from the embedded player telemetry scenario for this prototype.",
-            )
         else:
             telemetry["qoe_score"] = st.number_input(
                 "QoE score",
@@ -312,6 +362,7 @@ def run_multi_agent_workflow(
     communication_log: list[dict[str, Any]] = []
     band_result: dict[str, Any] | None = None
     agent_states = dict(default_agent_states)
+    embedded_mode = source_config["mode"] == "Embedded HLS player"
     allow_customer_care = (
         playback_impact.get("should_run_customer_care", True)
         if playback_impact is not None
@@ -332,6 +383,7 @@ def run_multi_agent_workflow(
             workflow_state=agent_states,
             band_config=band_config,
             action_summary=action_summary,
+            show_incident_card=not embedded_mode,
         )
     time.sleep(0.2)
 
@@ -369,6 +421,7 @@ def run_multi_agent_workflow(
                 workflow_state=agent_states,
                 band_config=band_config,
                 action_summary=action_summary,
+                show_incident_card=not embedded_mode,
             )
         shared_context = {
             "room_status": "Monitoring complete",
@@ -426,6 +479,7 @@ def run_multi_agent_workflow(
             workflow_state=agent_states,
             band_config=band_config,
             action_summary=action_summary,
+            show_incident_card=not embedded_mode,
         )
     time.sleep(0.15)
 
@@ -455,13 +509,14 @@ def run_multi_agent_workflow(
             "band": "Enabled" if band_config.enabled else "Disabled",
         }
         with summary_placeholder.container():
-            render_top_summary_cards(
-                telemetry=telemetry,
-                qoe_preview=qoe_result,
-                workflow_state=agent_states,
-                band_config=band_config,
-                action_summary=action_summary,
-            )
+                render_top_summary_cards(
+                    telemetry=telemetry,
+                    qoe_preview=qoe_result,
+                    workflow_state=agent_states,
+                    band_config=band_config,
+                    action_summary=action_summary,
+                    show_incident_card=not embedded_mode,
+                )
         time.sleep(0.15)
 
         recovery_text = recovery_action_agent(telemetry, diagnosis_text, selected_model)
@@ -497,6 +552,7 @@ def run_multi_agent_workflow(
                     workflow_state=agent_states,
                     band_config=band_config,
                     action_summary=action_summary,
+                    show_incident_card=not embedded_mode,
                 )
             time.sleep(0.15)
 
@@ -555,6 +611,7 @@ def run_multi_agent_workflow(
             workflow_state=agent_states,
             band_config=band_config,
             action_summary=action_summary,
+            show_incident_card=not embedded_mode,
         )
 
     shared_context = {
@@ -645,24 +702,6 @@ def main() -> None:
             refresh_epoch=st.session_state.player_last_refresh_epoch,
             playback_impact=playback_impact,
         )
-
-        if playback_impact is not None:
-            if playback_impact["impact_status"] == "Stable":
-                st.success(
-                    "Playback is stable. Buffer health and playback smoothness look healthy. FlowWatch will continue monitoring."
-                )
-            elif playback_impact["impact_status"] == "At Risk":
-                st.info(
-                    "QoE risk detected, but playback impact is not confirmed. Buffer is still healthy, so FlowWatch will continue monitoring."
-                )
-            elif playback_impact["impact_status"] == "Impact Confirmed":
-                st.warning(
-                    "Playback impact detected from embedded player telemetry. FlowWatch can run diagnosis and recovery for this incident."
-                )
-            elif playback_impact["impact_status"] == "Critical":
-                st.error(
-                    "Critical playback degradation detected. FlowWatch can trigger the full agent workflow."
-                )
         if st_autorefresh is None and source_config["player_refresh_enabled"]:
             st.info(
                 "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
@@ -689,10 +728,10 @@ def main() -> None:
                 "Critical": "Critical impact",
             }.get(playback_impact["impact_status"], "Playback monitor"),
             "detail": {
-                "Stable": "QoE is being monitored, but no playback impact is confirmed.",
-                "At Risk": "Potential degradation detected. Continue monitoring before agent escalation.",
-                "Impact Confirmed": "Playback smoothness is affected. Diagnosis and recovery are recommended.",
-                "Critical": "Playback degradation is confirmed. Trigger the full agent workflow.",
+                "Stable": "Monitoring only — no playback impact confirmed.",
+                "At Risk": "QoE risk detected — watching for playback impact.",
+                "Impact Confirmed": "Playback impact confirmed — diagnosis and recovery recommended.",
+                "Critical": "Critical impact — full workflow recommended.",
             }.get(playback_impact["impact_status"], "Monitoring embedded playback telemetry."),
             "priority": "High"
             if playback_impact["impact_status"] in {"Impact Confirmed", "Critical"}
@@ -708,6 +747,7 @@ def main() -> None:
             workflow_state=default_agent_states,
             band_config=band_config,
             action_summary=action_summary,
+            show_incident_card=source_config["mode"] != "Embedded HLS player",
         )
 
     render_kpi_cards(telemetry)
@@ -750,7 +790,8 @@ def main() -> None:
             playback_impact=playback_impact,
         )
     else:
-        render_empty_state()
+        if source_config["mode"] != "Embedded HLS player":
+            render_empty_state()
 
 
 if __name__ == "__main__":
