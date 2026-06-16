@@ -57,6 +57,11 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
         ("Customer Care Agent", "Communicate", "💬"),
     ]
     parts: list[str] = []
+    state_labels = {
+        "waiting": "Waiting",
+        "active": "Running",
+        "done": "Done",
+    }
     for index, (agent_name, label, icon) in enumerate(steps):
         state = workflow_state.get(agent_name, "waiting")
         parts.append(
@@ -65,7 +70,7 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
             f'<div class="workflow-icon">{icon}</div>'
             f'<div class="workflow-copy">'
             f'<span class="workflow-label">{label}</span>'
-            f'<span class="workflow-status">{state.title()}</span>'
+            f'<span class="workflow-status">{state_labels.get(state, "Waiting")}</span>'
             f"</div>"
             f"</div>"
             f"</div>"
@@ -99,7 +104,7 @@ def render_top_summary_cards(
         "band": "Enabled" if band_config.enabled else "Disabled",
     }
 
-    cols = st.columns([1.05, 1.55, 1.15], gap="large")
+    cols = st.columns([0.95, 2.05], gap="large")
     cols[0].markdown(
         f"""
         <div class="summary-card incident-card {qoe_status}">
@@ -119,21 +124,17 @@ def render_top_summary_cards(
     cols[1].markdown(
         f"""
         <div class="summary-card workflow-card">
-            <p class="summary-eyebrow">Agent Workflow</p>
+            <div class="workflow-topline">
+                <p class="summary-eyebrow">Agent Workflow</p>
+                <div class="workflow-live-chip">{action_summary['title']}</div>
+            </div>
             {render_workflow_stepper(workflow_state)}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    cols[2].markdown(
-        f"""
-        <div class="summary-card action-card">
-            <p class="summary-eyebrow">Action Summary</p>
-            <h3>{action_summary['title']}</h3>
-            <p>{action_summary['detail']}</p>
-            <div class="action-meta-row">
-                {render_status_chip(f"Priority: {action_summary['priority']}", "warning")}
-                {render_status_chip(f"Band: {action_summary['band']}", "info")}
+            <div class="workflow-activity-panel">
+                <p class="workflow-activity-text">{action_summary['detail']}</p>
+                <div class="action-meta-row">
+                    {render_status_chip(f"Priority: {action_summary['priority']}", "warning")}
+                    {render_status_chip(f"Band: {action_summary['band']}", "info")}
+                </div>
             </div>
         </div>
         """,

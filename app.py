@@ -426,8 +426,8 @@ def main() -> None:
     st.set_page_config(page_title="FlowWatch", page_icon="📺", layout="wide")
     apply_theme()
     initialize_session_state()
-    selected_model, telemetry = render_sidebar_telemetry_inputs()
     band_config = build_band_config()
+    selected_model, telemetry = render_sidebar_telemetry_inputs()
     qoe_preview = qoe_monitoring_agent(telemetry)
 
     render_compact_header(

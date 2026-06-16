@@ -252,6 +252,7 @@ html, body, [class*="css"] {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 0.9rem;
 }
 
 .workflow-stepper {
@@ -263,6 +264,26 @@ html, body, [class*="css"] {
     flex-wrap: nowrap;
     margin-top: auto;
     overflow: hidden;
+}
+
+.workflow-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+}
+
+.workflow-live-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.38rem 0.72rem;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.22);
+    color: var(--primary);
+    font-size: 0.76rem;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
 .workflow-step {
@@ -336,6 +357,7 @@ html, body, [class*="css"] {
     box-shadow:
         0 0 0 1px rgba(34, 197, 94, 0.22),
         0 16px 40px rgba(34, 197, 94, 0.12);
+    transform: translateY(-1px);
 }
 
 .workflow-step.done {
@@ -347,6 +369,11 @@ html, body, [class*="css"] {
 .workflow-step.active .workflow-icon {
     background: rgba(34, 197, 94, 0.18);
     border-color: rgba(34, 197, 94, 0.4);
+}
+
+.workflow-step.active .workflow-icon {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.08);
+    animation: workflowPulse 1.5s ease-in-out infinite;
 }
 
 .flow-connector {
@@ -367,6 +394,17 @@ html, body, [class*="css"] {
     animation: pulseArrow 1.4s ease-in-out infinite;
 }
 
+@keyframes workflowPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.1);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(34, 197, 94, 0.02);
+    }
+}
+
 @keyframes pulseArrow {
     0%, 100% {
         opacity: 0.45;
@@ -378,17 +416,19 @@ html, body, [class*="css"] {
     }
 }
 
-.action-card h3 {
-    margin: 0;
-    color: var(--text);
-    font-size: 1.15rem;
+.workflow-activity-panel {
+    margin-top: 0.05rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 16px;
+    border: 1px solid rgba(74, 222, 128, 0.14);
+    background: rgba(34, 197, 94, 0.06);
 }
 
-.action-card p {
-    margin: 0.6rem 0 0.8rem 0;
+.workflow-activity-text {
+    margin: 0 0 0.75rem 0;
     color: var(--muted);
-    font-size: 0.92rem;
-    line-height: 1.55;
+    font-size: 0.88rem;
+    line-height: 1.5;
 }
 
 .action-meta-row {
@@ -564,6 +604,11 @@ html, body, [class*="css"] {
         flex: 1 1 calc(50% - 0.4rem);
         width: auto;
         min-width: 220px;
+    }
+
+    .workflow-topline {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 
