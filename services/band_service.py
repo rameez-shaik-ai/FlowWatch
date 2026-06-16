@@ -27,6 +27,19 @@ except ImportError as exc:
     BAND_IMPORT_ERROR = str(exc)
 
 
+def _safe_event_metadata(payload: dict[str, Any]) -> dict[str, str]:
+    """Keep Band metadata compact and string-based for demo reliability."""
+    metadata: dict[str, str] = {}
+    for key, value in payload.items():
+        if value is None:
+            continue
+        if isinstance(value, (dict, list, tuple)):
+            metadata[key] = str(value)
+        else:
+            metadata[key] = str(value)
+    return metadata
+
+
 def build_band_config() -> BandConfig:
     """Render sidebar Band settings and return the current configuration."""
     participants: list[BandParticipant] = []
@@ -133,7 +146,6 @@ async def publish_workflow_to_band(
         api_key=band_config.api_key,
         base_url=band_config.rest_url.rstrip("/"),
     )
-    task_id = None
     room_response = await client.agent_api_chats.create_agent_chat(
         chat=ChatRoomRequest(),
         request_options=DEFAULT_REQUEST_OPTIONS,
@@ -141,25 +153,31 @@ async def publish_workflow_to_band(
     room_id = room_response.data.id
 
     added_participants: list[str] = []
+    warnings: list[str] = []
     for participant in band_config.participants:
-        await client.agent_api_participants.add_agent_chat_participant(
-            chat_id=room_id,
-            participant=ParticipantRequest(participant_id=participant.participant_id),
-            request_options=DEFAULT_REQUEST_OPTIONS,
-        )
-        added_participants.append(participant.display_name)
+        try:
+            await client.agent_api_participants.add_agent_chat_participant(
+                chat_id=room_id,
+                participant=ParticipantRequest(participant_id=participant.participant_id),
+                request_options=DEFAULT_REQUEST_OPTIONS,
+            )
+            added_participants.append(participant.display_name)
+        except Exception as exc:
+            warnings.append(f"Could not add {participant.display_name}: {exc}")
 
     await client.agent_api_events.create_agent_chat_event(
         chat_id=room_id,
         event=ChatEventRequest(
             content="FlowWatch started a proactive QoE investigation.",
-            message_type="task",
-            metadata={
+            message_type="thought",
+            metadata=_safe_event_metadata(
+                {
                 "customer_id": telemetry["customer_id"],
                 "service": telemetry["service"],
                 "orchestrator_agent_id": band_config.agent_id or "not_provided",
                 "model_name": model_name,
-            },
+                }
+            ),
         ),
         request_options=DEFAULT_REQUEST_OPTIONS,
     )
@@ -169,7 +187,7 @@ async def publish_workflow_to_band(
         event=ChatEventRequest(
             content=f"QoE monitoring classified the session as {qoe_result['qoe_status']}.",
             message_type="thought",
-            metadata=qoe_result,
+            metadata=_safe_event_metadata(qoe_result),
         ),
         request_options=DEFAULT_REQUEST_OPTIONS,
     )
@@ -179,8 +197,8 @@ async def publish_workflow_to_band(
             chat_id=room_id,
             event=ChatEventRequest(
                 content="Diagnosis completed and published to the room.",
-                message_type="task",
-                metadata={"diagnosis": diagnosis_text},
+                message_type="thought",
+                metadata=_safe_event_metadata({"diagnosis": diagnosis_text}),
             ),
             request_options=DEFAULT_REQUEST_OPTIONS,
         )
@@ -190,8 +208,8 @@ async def publish_workflow_to_band(
             chat_id=room_id,
             event=ChatEventRequest(
                 content="Recovery plan completed and published to the room.",
-                message_type="task",
-                metadata={"recovery_plan": recovery_text},
+                message_type="thought",
+                metadata=_safe_event_metadata({"recovery_plan": recovery_text}),
             ),
             request_options=DEFAULT_REQUEST_OPTIONS,
         )
@@ -201,8 +219,8 @@ async def publish_workflow_to_band(
             chat_id=room_id,
             event=ChatEventRequest(
                 content="Customer care communication package completed.",
-                message_type="task",
-                metadata={"customer_care": customer_care_text},
+                message_type="thought",
+                metadata=_safe_event_metadata({"customer_care": customer_care_text}),
             ),
             request_options=DEFAULT_REQUEST_OPTIONS,
         )
@@ -252,28 +270,31 @@ async def publish_workflow_to_band(
         )
         if participant is None:
             continue
-        await client.agent_api_messages.create_agent_chat_message(
-            chat_id=room_id,
-            message=ChatMessageRequest(
-                content=message,
-                mentions=[
-                    ChatMessageRequestMentionsItem(
-                        id=participant.participant_id,
-                        name=participant.display_name,
-                    )
-                ],
-            ),
-            request_options=DEFAULT_REQUEST_OPTIONS,
-        )
-        published_messages += 1
+        try:
+            await client.agent_api_messages.create_agent_chat_message(
+                chat_id=room_id,
+                message=ChatMessageRequest(
+                    content=f"@{participant.display_name}\n\n{message}",
+                    mentions=[
+                        ChatMessageRequestMentionsItem(
+                            id=participant.participant_id,
+                            name=participant.display_name,
+                        )
+                    ],
+                ),
+                request_options=DEFAULT_REQUEST_OPTIONS,
+            )
+            published_messages += 1
+        except Exception as exc:
+            warnings.append(f"Could not message {participant.display_name}: {exc}")
 
     return {
         "published": True,
         "room_id": room_id,
-        "task_id": task_id,
         "participants_added": added_participants,
         "participant_messages_sent": published_messages,
         "rest_url": band_config.rest_url,
+        "warnings": warnings,
     }
 
 

@@ -4,6 +4,7 @@ import os
 
 import streamlit as st
 from dotenv import load_dotenv
+from streamlit.errors import StreamlitSecretNotFoundError
 
 
 load_dotenv()
@@ -28,10 +29,13 @@ DEFAULT_TELEMETRY = {
     "latency_ms": 180,
     "packet_loss": 3.2,
     "app_crashes": 1,
-    "qoe_score": 42,
+    "qoe_score": 0,
 }
 
 
 def get_secret(name: str, default: str = "") -> str:
     """Read a secret from Streamlit first, then fall back to environment variables."""
-    return st.secrets.get(name, os.getenv(name, default))
+    try:
+        return st.secrets.get(name, os.getenv(name, default))
+    except StreamlitSecretNotFoundError:
+        return os.getenv(name, default)

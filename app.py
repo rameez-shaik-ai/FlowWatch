@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -9,26 +10,20 @@ from agents.customer_care_agent import customer_care_agent
 from agents.diagnosis_agent import diagnosis_agent
 from agents.qoe_monitoring_agent import qoe_monitoring_agent
 from agents.recovery_action_agent import recovery_action_agent
-from config import DEFAULT_MODEL, DEFAULT_TELEMETRY, MODEL_OPTIONS
+from config import DEFAULT_MODEL, DEFAULT_TELEMETRY, MODEL_OPTIONS, get_secret
 from services.band_service import (
-    BAND_SDK_AVAILABLE,
     build_band_config,
     create_band_event,
     run_band_publish,
 )
 from services.telemetry_service import load_live_telemetry
 from ui.components import (
-    render_agent_box,
-    render_agent_orchestration_board,
-    render_band_room,
-    render_raw_telemetry_json,
-    render_telemetry_metrics,
-    render_workflow_status_panels,
-)
-from ui.layout import (
-    render_hackathon_alignment,
-    render_hero,
-    render_overview_cards,
+    render_compact_header,
+    render_empty_state,
+    render_kpi_cards,
+    render_results_tabs,
+    render_run_control,
+    render_top_summary_cards,
 )
 from ui.styles import apply_theme
 from utils.qoe_scoring import (
@@ -39,7 +34,6 @@ from utils.qoe_scoring import (
 
 
 def initialize_session_state() -> None:
-    """Prepare Streamlit session defaults for telemetry and source mode."""
     if "telemetry_source_mode" not in st.session_state:
         st.session_state.telemetry_source_mode = "Manual"
     if "telemetry_values" not in st.session_state:
@@ -47,19 +41,22 @@ def initialize_session_state() -> None:
 
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
-    """Render the telemetry sidebar controls and return the selected model + telemetry."""
     with st.sidebar:
-        st.header("Model & Telemetry")
+        st.markdown("### Model")
         selected_model = st.selectbox(
             "AI/ML model",
             MODEL_OPTIONS,
             index=MODEL_OPTIONS.index(DEFAULT_MODEL),
             help="Switch models if one provider route is temporarily unavailable.",
+            label_visibility="collapsed",
         )
+
+        st.markdown("### Telemetry Source")
         st.session_state.telemetry_source_mode = st.radio(
             "Telemetry source",
             ["Manual", "Live API fetch"],
             index=0 if st.session_state.telemetry_source_mode == "Manual" else 1,
+            label_visibility="collapsed",
         )
 
         if st.session_state.telemetry_source_mode == "Manual":
@@ -88,20 +85,12 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
                     st.session_state.telemetry_values = telemetry_data
                     st.success("Live telemetry loaded into the dashboard.")
 
+        st.markdown("### Telemetry Fields")
         telemetry_defaults = st.session_state.telemetry_values
         telemetry = {
-            "customer_id": st.text_input(
-                "Customer ID",
-                value=telemetry_defaults["customer_id"],
-            ),
-            "device_id": st.text_input(
-                "Device ID",
-                value=telemetry_defaults["device_id"],
-            ),
-            "service": st.text_input(
-                "Service",
-                value=telemetry_defaults["service"],
-            ),
+            "customer_id": st.text_input("Customer ID", value=telemetry_defaults["customer_id"]),
+            "device_id": st.text_input("Device ID", value=telemetry_defaults["device_id"]),
+            "service": st.text_input("Service", value=telemetry_defaults["service"]),
             "bitrate_mbps": st.number_input(
                 "Bitrate Mbps",
                 min_value=0.0,
@@ -160,66 +149,50 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
     return selected_model, telemetry
 
 
-def render_result_tabs(
-    room_id: str,
-    shared_context: dict[str, Any],
-    communication_log: list[dict[str, Any]],
-    band_result: dict[str, Any] | None,
-    qoe_result: dict[str, Any],
-    diagnosis_text: str | None,
-    recovery_text: str | None,
-    customer_care_text: str | None,
-) -> None:
-    if diagnosis_text is None:
-        tabs = st.tabs(["Monitoring", "Band", "Alignment"])
-        with tabs[0]:
-            render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
-        with tabs[1]:
-            render_band_room(room_id, shared_context, communication_log, band_result)
-        with tabs[2]:
-            render_hackathon_alignment()
-        return
-
-    result_tabs = st.tabs(
-        ["Monitoring", "Diagnosis", "Recovery", "Customer Care", "Band", "Alignment"]
+def extract_priority_level(customer_care_text: str | None) -> str:
+    if not customer_care_text:
+        return "Pending"
+    match = re.search(
+        r"Priority Level\s+([A-Za-z]+)",
+        customer_care_text,
+        flags=re.IGNORECASE,
     )
-    with result_tabs[0]:
-        render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
-    with result_tabs[1]:
-        render_agent_box("Diagnosis Agent", diagnosis_text)
-    with result_tabs[2]:
-        render_agent_box("Recovery Action Agent", recovery_text or "")
-    with result_tabs[3]:
-        render_agent_box("Customer Care Agent", customer_care_text or "")
-    with result_tabs[4]:
-        render_band_room(room_id, shared_context, communication_log, band_result)
-    with result_tabs[5]:
-        render_hackathon_alignment()
+    return match.group(1).title() if match else "Available"
 
 
 def run_multi_agent_workflow(
+    *,
     telemetry: dict[str, Any],
     selected_model: str,
     band_config,
-    orchestration_placeholder,
+    summary_placeholder,
     default_agent_states: dict[str, str],
-    default_agent_messages: dict[str, str],
+    qoe_preview: dict[str, Any],
 ) -> None:
     room_id = f"band-room-{telemetry['customer_id'].lower()}"
     communication_log: list[dict[str, Any]] = []
     band_result: dict[str, Any] | None = None
     agent_states = dict(default_agent_states)
-    agent_messages = dict(default_agent_messages)
 
+    action_summary = {
+        "title": "Monitoring in progress",
+        "detail": "Checking the session against FlowWatch QoE thresholds.",
+        "priority": "Pending",
+        "band": "Enabled" if band_config.enabled else "Disabled",
+    }
     agent_states["QoE Monitoring Agent"] = "active"
-    agent_messages["QoE Monitoring Agent"] = "Reading telemetry and checking thresholds"
-    with orchestration_placeholder.container():
-        render_agent_orchestration_board(agent_states, agent_messages, band_config)
-    time.sleep(0.25)
+    with summary_placeholder.container():
+        render_top_summary_cards(
+            telemetry=telemetry,
+            qoe_preview=qoe_preview,
+            workflow_state=agent_states,
+            band_config=band_config,
+            action_summary=action_summary,
+        )
+    time.sleep(0.2)
 
     qoe_result = qoe_monitoring_agent(telemetry)
     agent_states["QoE Monitoring Agent"] = "done"
-    agent_messages["QoE Monitoring Agent"] = qoe_result["customer_impact_summary"]
     communication_log.append(
         create_band_event(
             step=1,
@@ -232,8 +205,20 @@ def run_multi_agent_workflow(
     )
 
     if qoe_result["qoe_status"] == "Good":
-        with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, agent_messages, band_config)
+        action_summary = {
+            "title": "Passive monitoring",
+            "detail": "QoE is healthy. No escalation or customer outreach is required.",
+            "priority": "Low",
+            "band": "Published" if band_config.enabled else "Disabled",
+        }
+        with summary_placeholder.container():
+            render_top_summary_cards(
+                telemetry=telemetry,
+                qoe_preview=qoe_result,
+                workflow_state=agent_states,
+                band_config=band_config,
+                action_summary=action_summary,
+            )
         shared_context = {
             "room_status": "Monitoring complete",
             "customer_id": telemetry["customer_id"],
@@ -254,7 +239,7 @@ def run_multi_agent_workflow(
         st.success(
             "QoE looks healthy. FlowWatch stopped after monitoring because no further action is required."
         )
-        render_result_tabs(
+        render_results_tabs(
             room_id=room_id,
             shared_context=shared_context,
             communication_log=communication_log,
@@ -263,19 +248,30 @@ def run_multi_agent_workflow(
             diagnosis_text=None,
             recovery_text=None,
             customer_care_text=None,
+            telemetry=telemetry,
         )
         return
 
     agent_states["Diagnosis Agent"] = "active"
-    agent_messages["Diagnosis Agent"] = "Analyzing telemetry for root cause"
-    with orchestration_placeholder.container():
-        render_agent_orchestration_board(agent_states, agent_messages, band_config)
-    time.sleep(0.2)
+    action_summary = {
+        "title": "Diagnosis running",
+        "detail": "Telemetry is being analyzed to identify the likely root cause.",
+        "priority": "Medium",
+        "band": "Enabled" if band_config.enabled else "Disabled",
+    }
+    with summary_placeholder.container():
+        render_top_summary_cards(
+            telemetry=telemetry,
+            qoe_preview=qoe_result,
+            workflow_state=agent_states,
+            band_config=band_config,
+            action_summary=action_summary,
+        )
+    time.sleep(0.15)
 
     with st.spinner("Running diagnosis, recovery, customer care, and Band sync..."):
         diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
         agent_states["Diagnosis Agent"] = "done"
-        agent_messages["Diagnosis Agent"] = "Root cause assessment prepared"
         communication_log.append(
             create_band_event(
                 step=2,
@@ -292,14 +288,24 @@ def run_multi_agent_workflow(
         )
 
         agent_states["Recovery Action Agent"] = "active"
-        agent_messages["Recovery Action Agent"] = "Designing safe recovery sequence"
-        with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, agent_messages, band_config)
-        time.sleep(0.2)
+        action_summary = {
+            "title": "Recovery planning",
+            "detail": "FlowWatch is preparing safe remediation guidance for this incident.",
+            "priority": "High",
+            "band": "Enabled" if band_config.enabled else "Disabled",
+        }
+        with summary_placeholder.container():
+            render_top_summary_cards(
+                telemetry=telemetry,
+                qoe_preview=qoe_result,
+                workflow_state=agent_states,
+                band_config=band_config,
+                action_summary=action_summary,
+            )
+        time.sleep(0.15)
 
         recovery_text = recovery_action_agent(telemetry, diagnosis_text, selected_model)
         agent_states["Recovery Action Agent"] = "done"
-        agent_messages["Recovery Action Agent"] = "Recommended actions are ready"
         communication_log.append(
             create_band_event(
                 step=3,
@@ -316,12 +322,21 @@ def run_multi_agent_workflow(
         )
 
         agent_states["Customer Care Agent"] = "active"
-        agent_messages["Customer Care Agent"] = (
-            "Drafting customer and internal support messages"
-        )
-        with orchestration_placeholder.container():
-            render_agent_orchestration_board(agent_states, agent_messages, band_config)
-        time.sleep(0.2)
+        action_summary = {
+            "title": "Communication drafting",
+            "detail": "Preparing customer-safe messaging and support-team summary.",
+            "priority": "High",
+            "band": "Enabled" if band_config.enabled else "Disabled",
+        }
+        with summary_placeholder.container():
+            render_top_summary_cards(
+                telemetry=telemetry,
+                qoe_preview=qoe_result,
+                workflow_state=agent_states,
+                band_config=band_config,
+                action_summary=action_summary,
+            )
+        time.sleep(0.15)
 
         customer_care_text = customer_care_agent(
             telemetry,
@@ -330,7 +345,6 @@ def run_multi_agent_workflow(
             selected_model,
         )
         agent_states["Customer Care Agent"] = "done"
-        agent_messages["Customer Care Agent"] = "Customer message and ticket summary ready"
         communication_log.append(
             create_band_event(
                 step=4,
@@ -356,8 +370,26 @@ def run_multi_agent_workflow(
             selected_model,
         )
 
-    with orchestration_placeholder.container():
-        render_agent_orchestration_board(agent_states, agent_messages, band_config)
+    action_summary = {
+        "title": "Proactive outreach",
+        "detail": "The incident summary, next action, and customer communication are ready.",
+        "priority": extract_priority_level(customer_care_text),
+        "band": (
+            "Published"
+            if band_result and band_result.get("published")
+            else "Failed"
+            if band_config.enabled
+            else "Disabled"
+        ),
+    }
+    with summary_placeholder.container():
+        render_top_summary_cards(
+            telemetry=telemetry,
+            qoe_preview=qoe_result,
+            workflow_state=agent_states,
+            band_config=band_config,
+            action_summary=action_summary,
+        )
 
     shared_context = {
         "room_status": "Escalation coordinated",
@@ -374,7 +406,7 @@ def run_multi_agent_workflow(
         "selected_model": selected_model,
         "next_action": "Proactive outreach and continued monitoring",
     }
-    render_result_tabs(
+    render_results_tabs(
         room_id=room_id,
         shared_context=shared_context,
         communication_log=communication_log,
@@ -383,6 +415,7 @@ def run_multi_agent_workflow(
         diagnosis_text=diagnosis_text,
         recovery_text=recovery_text,
         customer_care_text=customer_care_text,
+        telemetry=telemetry,
     )
     st.success(
         "FlowWatch analysis complete. The multi-agent workflow and Band communication layer are ready for demo."
@@ -393,19 +426,13 @@ def main() -> None:
     st.set_page_config(page_title="FlowWatch", page_icon="📺", layout="wide")
     apply_theme()
     initialize_session_state()
-    band_config = build_band_config()
     selected_model, telemetry = render_sidebar_telemetry_inputs()
+    band_config = build_band_config()
+    qoe_preview = qoe_monitoring_agent(telemetry)
 
-    render_hero(band_config)
-    st.write("")
-    render_overview_cards()
-    st.write("")
-
-    render_workflow_status_panels(band_config, BAND_SDK_AVAILABLE)
-    run_clicked = st.button(
-        "🚀 Run FlowWatch Multi-Agent Analysis",
-        type="primary",
-        use_container_width=True,
+    render_compact_header(
+        band_config=band_config,
+        aiml_ready=bool(get_secret("AIML_API_KEY")),
     )
 
     default_agent_states = {
@@ -414,32 +441,37 @@ def main() -> None:
         "Recovery Action Agent": "waiting",
         "Customer Care Agent": "waiting",
     }
-    default_agent_messages = {
-        "QoE Monitoring Agent": "Awaiting telemetry",
-        "Diagnosis Agent": "Waiting for QoE handoff",
-        "Recovery Action Agent": "Waiting for diagnosis",
-        "Customer Care Agent": "Waiting for recovery plan",
+    action_summary = {
+        "title": "Ready to analyze",
+        "detail": "FlowWatch will monitor QoE, diagnose root cause, recommend safe actions, and prepare customer communication.",
+        "priority": "Pending",
+        "band": "Enabled" if band_config.enabled else "Disabled",
     }
-    orchestration_placeholder = st.empty()
-    with orchestration_placeholder.container():
-        render_agent_orchestration_board(
-            default_agent_states,
-            default_agent_messages,
-            band_config,
+
+    summary_placeholder = st.empty()
+    with summary_placeholder.container():
+        render_top_summary_cards(
+            telemetry=telemetry,
+            qoe_preview=qoe_preview,
+            workflow_state=default_agent_states,
+            band_config=band_config,
+            action_summary=action_summary,
         )
 
-    render_telemetry_metrics(telemetry)
-    render_raw_telemetry_json(telemetry)
+    render_kpi_cards(telemetry)
+    run_clicked = render_run_control()
 
     if run_clicked:
         run_multi_agent_workflow(
             telemetry=telemetry,
             selected_model=selected_model,
             band_config=band_config,
-            orchestration_placeholder=orchestration_placeholder,
+            summary_placeholder=summary_placeholder,
             default_agent_states=default_agent_states,
-            default_agent_messages=default_agent_messages,
+            qoe_preview=qoe_preview,
         )
+    else:
+        render_empty_state()
 
 
 if __name__ == "__main__":
