@@ -225,6 +225,7 @@ def render_embedded_player_panel(
     telemetry: dict[str, Any],
     qoe_preview: dict[str, Any],
     refresh_epoch: float,
+    playback_impact: dict[str, Any] | None = None,
 ) -> None:
     qoe_status = qoe_preview["qoe_status"]
     qoe_tone = {
@@ -239,6 +240,16 @@ def render_embedded_player_panel(
         if qoe_status == "Good"
         else "Run FlowWatch analysis"
     )
+    impact = playback_impact or {}
+    impact_status = impact.get("impact_status", "Unknown")
+    impact_tone = {
+        "Stable": "success",
+        "At Risk": "warning",
+        "Impact Confirmed": "critical",
+        "Critical": "critical",
+    }.get(impact_status, "neutral")
+    impact_reasons = impact.get("reasons", [])
+    dropped_frame_ratio = float(impact.get("dropped_frame_ratio", 0.0)) * 100
 
     left, right = st.columns([1.7, 1], gap="large")
     with left:
@@ -266,10 +277,6 @@ def render_embedded_player_panel(
             st.warning("Add an HLS stream URL to render the embedded player.")
         else:
             components.html(build_hls_player_html(stream_url), height=590)
-        st.caption(
-            "The embedded player shows real browser playback metrics. In this prototype, Streamlit maps player conditions to dynamic QoE telemetry every few seconds. "
-            "In production, these values would come directly from hls.js, Shaka, dash.js, OpenQoE, Mux Data, Bitmovin Analytics, or the operator's player SDK."
-        )
 
     refresh_label = "Just now"
     if refresh_epoch:
@@ -296,6 +303,25 @@ def render_embedded_player_panel(
                     <div><span>Buffering</span><strong>{float(telemetry['buffering_ratio']):.1f}%</strong></div>
                     <div><span>Latency</span><strong>{int(telemetry['latency_ms'])} ms</strong></div>
                     <div><span>Packet loss</span><strong>{float(telemetry['packet_loss']):.1f}%</strong></div>
+                </div>
+                <div class="impact-gate-panel">
+                    <div class="impact-gate-head">
+                        <p class="summary-eyebrow">Playback Impact Gate</p>
+                        {render_status_chip(impact_status, impact_tone)}
+                    </div>
+                    <div class="impact-gate-copy">
+                        <div><span>Impact score</span><strong>{int(impact.get('impact_score', 0))}</strong></div>
+                        <div><span>Decision</span><strong>{escape(str(impact.get('decision', 'Monitoring embedded playback impact.')))}</strong></div>
+                    </div>
+                    <div class="impact-gate-grid">
+                        <div><span>Buffered ahead</span><strong>{float(telemetry.get('buffered_ahead_seconds', 0.0)):.1f}s</strong></div>
+                        <div><span>Player state</span><strong>{escape(str(telemetry.get('player_state', '-')))}</strong></div>
+                        <div><span>Dropped-frame ratio</span><strong>{dropped_frame_ratio:.1f}%</strong></div>
+                        <div><span>Stall count</span><strong>{int(telemetry.get('stall_count', 0))}</strong></div>
+                        <div><span>Resolution</span><strong>{escape(str(telemetry.get('resolution', '-')))}</strong></div>
+                        <div><span>Playback moving</span><strong>{'Yes' if telemetry.get('playback_time_moving') else 'No'}</strong></div>
+                    </div>
+                    {f"<ul class='impact-reasons'>{''.join(f'<li>{escape(str(reason))}</li>' for reason in impact_reasons)}</ul>" if impact_reasons else ""}
                 </div>
             </div>
             """,
@@ -325,18 +351,25 @@ def render_results_tabs(
             render_raw_telemetry_json(telemetry)
         return
 
-    tabs = st.tabs(["Monitor", "Diagnose", "Recover", "Communicate", "Band Trace", "Raw Telemetry"])
+    tab_names = ["Monitor", "Diagnose", "Recover"]
+    if customer_care_text is not None:
+        tab_names.append("Communicate")
+    tab_names.extend(["Band Trace", "Raw Telemetry"])
+    tabs = st.tabs(tab_names)
     with tabs[0]:
         render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
     with tabs[1]:
         render_agent_box("Diagnosis Agent", diagnosis_text)
     with tabs[2]:
         render_agent_box("Recovery Action Agent", recovery_text or "")
-    with tabs[3]:
-        render_agent_box("Customer Care Agent", customer_care_text or "")
-    with tabs[4]:
+    next_index = 3
+    if customer_care_text is not None:
+        with tabs[3]:
+            render_agent_box("Customer Care Agent", customer_care_text or "")
+        next_index = 4
+    with tabs[next_index]:
         render_band_room(room_id, shared_context, communication_log, band_result)
-    with tabs[5]:
+    with tabs[next_index + 1]:
         render_raw_telemetry_json(telemetry)
 
 

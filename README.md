@@ -32,6 +32,7 @@ FlowWatch/
     __init__.py
     aiml_api.py
     band_service.py
+    playback_impact_gate.py
     player_service.py
     telemetry_service.py
   agents/
@@ -70,6 +71,8 @@ FlowWatch/
   Handles Band SDK setup, configuration, publishing, and graceful fallback if the SDK is unavailable.
 - `services/player_service.py`
   Builds the embedded HLS player HTML and generates dynamic mapped telemetry for the player prototype mode.
+- `services/playback_impact_gate.py`
+  Evaluates whether degraded QoE has become visible playback impact before agents are triggered.
 - `services/telemetry_service.py`
   Loads and validates telemetry from live endpoints.
 - `agents/`
@@ -214,7 +217,23 @@ When `Embedded HLS player` is selected, FlowWatch exposes:
 
 ### Auto-analysis behavior
 
-If auto-analysis is enabled in embedded player mode, FlowWatch can trigger the agent workflow automatically when mapped QoE enters a warning or poor state. A cooldown is used to prevent repeated runs every refresh cycle.
+If auto-analysis is enabled in embedded player mode, FlowWatch first checks the Playback Impact Gate. A cooldown is used to prevent repeated runs every refresh cycle.
+
+## Playback Impact Gate
+
+QoE score alone does not always mean the customer can see playback impact.
+
+FlowWatch now checks player smoothness signals before triggering agents in embedded HLS mode, including:
+
+- buffer ahead
+- player state
+- playback progress
+- dropped-frame ratio
+- stall count
+- resolution
+- player errors
+
+If QoE is risky but playback is still smooth, FlowWatch continues monitoring. Agents trigger only when playback impact is confirmed or critical.
 
 ## How The Workflow Works
 

@@ -20,6 +20,7 @@ from services.band_service import (
     create_band_event,
     run_band_publish,
 )
+from services.playback_impact_gate import evaluate_playback_impact
 from services.player_service import (
     DEFAULT_HLS_STREAM_URL,
     generate_dynamic_player_telemetry,
@@ -225,6 +226,28 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             ),
         }
 
+        if st.session_state.telemetry_source_mode == "Embedded HLS player":
+            telemetry.update(
+                {
+                    "player_state": telemetry_defaults.get("player_state", "playing"),
+                    "playback_time_seconds": float(
+                        telemetry_defaults.get("playback_time_seconds", 0.0)
+                    ),
+                    "buffered_ahead_seconds": float(
+                        telemetry_defaults.get("buffered_ahead_seconds", 0.0)
+                    ),
+                    "resolution": telemetry_defaults.get("resolution", "1280x720"),
+                    "dropped_frames": int(telemetry_defaults.get("dropped_frames", 0)),
+                    "total_frames": int(telemetry_defaults.get("total_frames", 0)),
+                    "ready_state": int(telemetry_defaults.get("ready_state", 0)),
+                    "network_state": int(telemetry_defaults.get("network_state", 0)),
+                    "stall_count": int(telemetry_defaults.get("stall_count", 0)),
+                    "playback_time_moving": bool(
+                        telemetry_defaults.get("playback_time_moving", False)
+                    ),
+                }
+            )
+
         if st.session_state.telemetry_source_mode == "Manual":
             telemetry["qoe_score"] = calculate_qoe_score(telemetry)
             st.number_input(
@@ -283,11 +306,17 @@ def run_multi_agent_workflow(
     qoe_preview: dict[str, Any],
     source_config: dict[str, Any],
     auto_triggered: bool = False,
+    playback_impact: dict[str, Any] | None = None,
 ) -> None:
     room_id = f"band-room-{telemetry['customer_id'].lower()}"
     communication_log: list[dict[str, Any]] = []
     band_result: dict[str, Any] | None = None
     agent_states = dict(default_agent_states)
+    allow_customer_care = (
+        playback_impact.get("should_run_customer_care", True)
+        if playback_impact is not None
+        else True
+    )
 
     action_summary = {
         "title": "Monitoring in progress",
@@ -315,7 +344,14 @@ def run_multi_agent_workflow(
             receiver=qoe_result["recommended_next_agent"],
             event_type="room_publish",
             summary=f"Classified session as {qoe_result['qoe_status']}.",
-            payload=qoe_result,
+            payload=(
+                {
+                    **qoe_result,
+                    "playback_impact_gate": playback_impact,
+                }
+                if playback_impact is not None
+                else qoe_result
+            ),
         )
     )
 
@@ -348,6 +384,7 @@ def run_multi_agent_workflow(
                     "source": "Embedded HLS player",
                     "trigger": "QoE degradation" if auto_triggered else "Manual review",
                     "auto_triggered": auto_triggered,
+                    "playback_impact_gate": playback_impact,
                 }
             )
         band_result = run_band_publish(
@@ -433,7 +470,7 @@ def run_multi_agent_workflow(
             create_band_event(
                 step=3,
                 sender="Recovery Action Agent",
-                receiver="Customer Care Agent",
+                receiver="Customer Care Agent" if allow_customer_care else "Support Operations",
                 event_type="handoff",
                 summary="Shared recommended safe actions and monitoring plan.",
                 payload={
@@ -444,44 +481,46 @@ def run_multi_agent_workflow(
             )
         )
 
-        agent_states["Customer Care Agent"] = "active"
-        action_summary = {
-            "title": "Communication drafting",
-            "detail": "Preparing customer-safe messaging and support-team summary.",
-            "priority": "High",
-            "band": "Enabled" if band_config.enabled else "Disabled",
-        }
-        with summary_placeholder.container():
-            render_top_summary_cards(
-                telemetry=telemetry,
-                qoe_preview=qoe_result,
-                workflow_state=agent_states,
-                band_config=band_config,
-                action_summary=action_summary,
-            )
-        time.sleep(0.15)
+        customer_care_text = None
+        if allow_customer_care:
+            agent_states["Customer Care Agent"] = "active"
+            action_summary = {
+                "title": "Communication drafting",
+                "detail": "Preparing customer-safe messaging and support-team summary.",
+                "priority": "High",
+                "band": "Enabled" if band_config.enabled else "Disabled",
+            }
+            with summary_placeholder.container():
+                render_top_summary_cards(
+                    telemetry=telemetry,
+                    qoe_preview=qoe_result,
+                    workflow_state=agent_states,
+                    band_config=band_config,
+                    action_summary=action_summary,
+                )
+            time.sleep(0.15)
 
-        customer_care_text = customer_care_agent(
-            telemetry,
-            diagnosis_text,
-            recovery_text,
-            selected_model,
-        )
-        agent_states["Customer Care Agent"] = "done"
-        communication_log.append(
-            create_band_event(
-                step=4,
-                sender="Customer Care Agent",
-                receiver="Support Operations",
-                event_type="room_publish",
-                summary="Published customer communication and support summary.",
-                payload={
-                    "customer_care_output": customer_care_text,
-                    "device_id": telemetry["device_id"],
-                    "service": telemetry["service"],
-                },
+            customer_care_text = customer_care_agent(
+                telemetry,
+                diagnosis_text,
+                recovery_text,
+                selected_model,
             )
-        )
+            agent_states["Customer Care Agent"] = "done"
+            communication_log.append(
+                create_band_event(
+                    step=4,
+                    sender="Customer Care Agent",
+                    receiver="Support Operations",
+                    event_type="room_publish",
+                    summary="Published customer communication and support summary.",
+                    payload={
+                        "customer_care_output": customer_care_text,
+                        "device_id": telemetry["device_id"],
+                        "service": telemetry["service"],
+                    },
+                )
+            )
 
         band_result = run_band_publish(
             band_config,
@@ -494,9 +533,13 @@ def run_multi_agent_workflow(
         )
 
     action_summary = {
-        "title": "Proactive outreach",
-        "detail": "The incident summary, next action, and customer communication are ready.",
-        "priority": extract_priority_level(customer_care_text),
+        "title": "Proactive outreach" if allow_customer_care else "Recovery plan ready",
+        "detail": (
+            "The incident summary, next action, and customer communication are ready."
+            if allow_customer_care
+            else "Diagnosis and recovery are complete. Continue technical monitoring before customer outreach."
+        ),
+        "priority": extract_priority_level(customer_care_text) if allow_customer_care else "High",
         "band": (
             "Published"
             if band_result and band_result.get("published")
@@ -527,7 +570,11 @@ def run_multi_agent_workflow(
         ],
         "latest_status": qoe_result["qoe_status"],
         "selected_model": selected_model,
-        "next_action": "Proactive outreach and continued monitoring",
+        "next_action": (
+            "Proactive outreach and continued monitoring"
+            if allow_customer_care
+            else "Continue technical recovery monitoring"
+        ),
     }
     if source_config["mode"] == "Embedded HLS player":
         shared_context.update(
@@ -535,6 +582,7 @@ def run_multi_agent_workflow(
                 "source": "Embedded HLS player",
                 "trigger": "QoE degradation" if auto_triggered else "Manual review",
                 "auto_triggered": auto_triggered,
+                "playback_impact_gate": playback_impact,
             }
         )
     render_results_tabs(
@@ -576,6 +624,9 @@ def main() -> None:
     band_config = build_band_config()
     selected_model, telemetry, source_config = render_sidebar_telemetry_inputs()
     qoe_preview = qoe_monitoring_agent(telemetry)
+    playback_impact = None
+    if source_config["mode"] == "Embedded HLS player":
+        playback_impact = evaluate_playback_impact(telemetry, qoe_preview["qoe_status"])
 
     render_compact_header(
         band_config=band_config,
@@ -592,12 +643,26 @@ def main() -> None:
             telemetry=telemetry,
             qoe_preview=qoe_preview,
             refresh_epoch=st.session_state.player_last_refresh_epoch,
+            playback_impact=playback_impact,
         )
 
-        if qoe_preview["qoe_status"] in {"Poor", "Warning"}:
-            st.warning(
-                "Poor QoE detected from embedded player telemetry. FlowWatch can run agent analysis for this incident."
-            )
+        if playback_impact is not None:
+            if playback_impact["impact_status"] == "Stable":
+                st.success(
+                    "Playback is stable. Buffer health and playback smoothness look healthy. FlowWatch will continue monitoring."
+                )
+            elif playback_impact["impact_status"] == "At Risk":
+                st.info(
+                    "QoE risk detected, but playback impact is not confirmed. Buffer is still healthy, so FlowWatch will continue monitoring."
+                )
+            elif playback_impact["impact_status"] == "Impact Confirmed":
+                st.warning(
+                    "Playback impact detected from embedded player telemetry. FlowWatch can run diagnosis and recovery for this incident."
+                )
+            elif playback_impact["impact_status"] == "Critical":
+                st.error(
+                    "Critical playback degradation detected. FlowWatch can trigger the full agent workflow."
+                )
         if st_autorefresh is None and source_config["player_refresh_enabled"]:
             st.info(
                 "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
@@ -615,6 +680,25 @@ def main() -> None:
         "priority": "Pending",
         "band": "Enabled" if band_config.enabled else "Disabled",
     }
+    if source_config["mode"] == "Embedded HLS player" and playback_impact is not None:
+        action_summary = {
+            "title": {
+                "Stable": "Playback stable",
+                "At Risk": "QoE risk",
+                "Impact Confirmed": "Impact confirmed",
+                "Critical": "Critical impact",
+            }.get(playback_impact["impact_status"], "Playback monitor"),
+            "detail": {
+                "Stable": "QoE is being monitored, but no playback impact is confirmed.",
+                "At Risk": "Potential degradation detected. Continue monitoring before agent escalation.",
+                "Impact Confirmed": "Playback smoothness is affected. Diagnosis and recovery are recommended.",
+                "Critical": "Playback degradation is confirmed. Trigger the full agent workflow.",
+            }.get(playback_impact["impact_status"], "Monitoring embedded playback telemetry."),
+            "priority": "High"
+            if playback_impact["impact_status"] in {"Impact Confirmed", "Critical"}
+            else "Pending",
+            "band": "Enabled" if band_config.enabled else "Disabled",
+        }
 
     summary_placeholder = st.empty()
     with summary_placeholder.container():
@@ -633,10 +717,12 @@ def main() -> None:
     if (
         source_config["mode"] == "Embedded HLS player"
         and source_config["player_auto_run_enabled"]
-        and qoe_preview["qoe_status"] in {"Poor", "Warning"}
+        and playback_impact is not None
+        and playback_impact["should_run_diagnosis"]
     ):
         incident_key = (
             f"{telemetry['customer_id']}|{telemetry['device_id']}|{qoe_preview['qoe_status']}|"
+            f"{playback_impact['impact_status']}|"
             f"{source_config['player_scenario']}"
         )
         now = time.time()
@@ -648,7 +734,7 @@ def main() -> None:
             st.session_state.last_player_auto_run_ts = now
             auto_triggered = True
             st.info(
-                "Poor QoE detected from embedded player telemetry. FlowWatch analysis triggered."
+                f"{playback_impact['decision']} FlowWatch analysis triggered."
             )
 
     if run_clicked or auto_triggered:
@@ -661,6 +747,7 @@ def main() -> None:
             qoe_preview=qoe_preview,
             source_config=source_config,
             auto_triggered=auto_triggered,
+            playback_impact=playback_impact,
         )
     else:
         render_empty_state()

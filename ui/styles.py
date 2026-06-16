@@ -510,6 +510,75 @@ html, body, [class*="css"] {
     word-break: break-word;
 }
 
+.impact-gate-panel {
+    margin-top: 0.9rem;
+    padding: 0.9rem;
+    border-radius: 16px;
+    border: 1px solid rgba(74, 222, 128, 0.16);
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.impact-gate-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    margin-bottom: 0.65rem;
+}
+
+.impact-gate-head .summary-eyebrow {
+    margin-bottom: 0;
+}
+
+.impact-gate-copy {
+    display: grid;
+    grid-template-columns: 0.55fr 1.45fr;
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+}
+
+.impact-gate-copy div,
+.impact-gate-grid div {
+    min-width: 0;
+}
+
+.impact-gate-copy span,
+.impact-gate-grid span {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.impact-gate-copy strong,
+.impact-gate-grid strong {
+    display: block;
+    color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1.42;
+    word-break: break-word;
+}
+
+.impact-gate-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem 0.7rem;
+}
+
+.impact-reasons {
+    margin: 0.8rem 0 0 1rem;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.impact-reasons li + li {
+    margin-top: 0.22rem;
+}
+
 .kpi-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -685,6 +754,11 @@ html, body, [class*="css"] {
 
 @media (max-width: 980px) {
     .mapped-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .impact-gate-copy,
+    .impact-gate-grid {
         grid-template-columns: 1fr;
     }
 }

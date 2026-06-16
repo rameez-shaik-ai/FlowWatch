@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import random
 from textwrap import dedent
 from typing import Any
@@ -220,6 +219,16 @@ def get_initial_player_telemetry() -> dict[str, Any]:
         "latency_ms": 58,
         "packet_loss": 0.2,
         "app_crashes": 0,
+        "player_state": "playing",
+        "playback_time_seconds": 14.0,
+        "buffered_ahead_seconds": 18.5,
+        "resolution": "1920x1080",
+        "dropped_frames": 6,
+        "total_frames": 980,
+        "ready_state": 4,
+        "network_state": 1,
+        "stall_count": 0,
+        "playback_time_moving": True,
     }
     telemetry["qoe_score"] = calculate_qoe_score(telemetry)
     return telemetry
@@ -239,8 +248,20 @@ def generate_dynamic_player_telemetry(tick: int, scenario: str = "Auto") -> dict
             "latency_ms": int(40 + (tick % 5) * 9 + rng.uniform(0, 6)),
             "packet_loss": round(rng.uniform(0.0, 0.6), 1),
             "app_crashes": 0,
+            "player_state": "playing",
+            "playback_time_seconds": round(8 + tick * 2.8, 1),
+            "buffered_ahead_seconds": round(rng.uniform(12.0, 25.0), 1),
+            "resolution": "1920x1080" if tick % 3 else "1280x720",
+            "dropped_frames": 4 + (tick % 5),
+            "total_frames": 900 + tick * 45,
+            "ready_state": 4,
+            "network_state": 1,
+            "stall_count": 0,
+            "playback_time_moving": True,
         }
     elif scenario == "Degraded":
+        total_frames = 760 + tick * 26
+        dropped_frames = max(24, int(total_frames * (0.032 + (tick % 3) * 0.011)))
         telemetry = {
             "customer_id": "LIVE_PLAYER_001",
             "device_id": "BROWSER_HLS_PLAYER",
@@ -250,9 +271,21 @@ def generate_dynamic_player_telemetry(tick: int, scenario: str = "Auto") -> dict
             "latency_ms": int(150 + rng.uniform(0, 110)),
             "packet_loss": round(2.0 + rng.uniform(0.0, 2.5), 1),
             "app_crashes": 0 if tick % 5 else 1,
+            "player_state": "buffering" if tick % 2 == 0 else "waiting",
+            "playback_time_seconds": round(18 + tick * 0.3, 1),
+            "buffered_ahead_seconds": round(rng.uniform(0.5, 4.0), 1),
+            "resolution": "854x480" if tick % 2 == 0 else "640x360",
+            "dropped_frames": dropped_frames,
+            "total_frames": total_frames,
+            "ready_state": 2 if tick % 2 == 0 else 1,
+            "network_state": 2,
+            "stall_count": 1 + (1 if tick % 4 == 0 else 0),
+            "playback_time_moving": False if tick % 3 else True,
         }
     elif scenario == "Recovering":
         progress = min(1.0, max(0.0, tick / 6))
+        total_frames = 820 + tick * 34
+        dropped_frames = max(6, int(total_frames * max(0.007, 0.04 - progress * 0.028)))
         telemetry = {
             "customer_id": "LIVE_PLAYER_001",
             "device_id": "BROWSER_HLS_PLAYER",
@@ -262,14 +295,50 @@ def generate_dynamic_player_telemetry(tick: int, scenario: str = "Auto") -> dict
             "latency_ms": int(max(45, 220 - progress * 150 + rng.uniform(-10, 8))),
             "packet_loss": round(max(0.0, 3.4 - progress * 3.0 + rng.uniform(-0.2, 0.2)), 1),
             "app_crashes": 0,
+            "player_state": "playing" if progress >= 0.5 else "waiting",
+            "playback_time_seconds": round(12 + tick * (0.9 + progress * 1.8), 1),
+            "buffered_ahead_seconds": round(min(14.0, 2.0 + progress * 11.0 + rng.uniform(-0.4, 0.4)), 1),
+            "resolution": (
+                "640x360"
+                if progress < 0.25
+                else "854x480"
+                if progress < 0.55
+                else "1280x720"
+                if progress < 0.85
+                else "1920x1080"
+            ),
+            "dropped_frames": dropped_frames,
+            "total_frames": total_frames,
+            "ready_state": 3 if progress < 0.5 else 4,
+            "network_state": 2 if progress < 0.4 else 1,
+            "stall_count": 1 if progress < 0.6 else 0,
+            "playback_time_moving": progress >= 0.35,
         }
     else:
-        cycle = tick % 18
-        if cycle <= 6:
+        cycle = tick % 24
+        if cycle <= 7:
             return generate_dynamic_player_telemetry(tick, "Healthy")
-        if cycle <= 11:
+        if cycle <= 12:
+            telemetry = generate_dynamic_player_telemetry(tick, "Healthy")
+            telemetry.update(
+                {
+                    "bitrate_mbps": round(max(4.4, telemetry["bitrate_mbps"] - 1.2), 1),
+                    "buffering_ratio": round(min(3.2, telemetry["buffering_ratio"] + 1.4), 1),
+                    "latency_ms": int(min(135, telemetry["latency_ms"] + 42)),
+                    "packet_loss": round(min(1.6, telemetry["packet_loss"] + 0.7), 1),
+                    "buffered_ahead_seconds": round(rng.uniform(5.5, 9.5), 1),
+                    "resolution": "1280x720",
+                    "dropped_frames": 18 + (tick % 4),
+                    "total_frames": 920 + tick * 30,
+                    "stall_count": 0,
+                    "playback_time_moving": True,
+                }
+            )
+            telemetry["qoe_score"] = calculate_qoe_score(telemetry)
+            return telemetry
+        if cycle <= 17:
             return generate_dynamic_player_telemetry(tick, "Degraded")
-        return generate_dynamic_player_telemetry(cycle - 11, "Recovering")
+        return generate_dynamic_player_telemetry(cycle - 17, "Recovering")
 
     telemetry["qoe_score"] = calculate_qoe_score(telemetry)
     return telemetry
