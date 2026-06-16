@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
     <style>
       html, body {
         margin: 0;
@@ -116,6 +115,43 @@
       </div>
     </div>
     <script>
+      function sendMessageToStreamlitClient(type, data) {
+        const outData = Object.assign(
+          {
+            isStreamlitMessage: true,
+            type: type,
+          },
+          data || {}
+        );
+        window.parent.postMessage(outData, "*");
+      }
+
+      const Streamlit = {
+        setComponentReady: function() {
+          sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1 });
+        },
+        setFrameHeight: function(height) {
+          sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+        },
+        setComponentValue: function(value) {
+          sendMessageToStreamlitClient("streamlit:setComponentValue", { value: value });
+        },
+        events: {
+          addEventListener: function(_eventName, callback) {
+            window.addEventListener("message", function(event) {
+              if (
+                event &&
+                event.data &&
+                event.data.type === "streamlit:render"
+              ) {
+                callback({ detail: event.data });
+              }
+            });
+          },
+        },
+        RENDER_EVENT: "streamlit:render",
+      };
+
       const video = document.getElementById("video");
       const noteEl = document.getElementById("playerNote");
       let hls = null;
