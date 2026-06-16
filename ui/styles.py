@@ -205,6 +205,9 @@ html, body, [class*="css"] {
 .summary-card {
     padding: 1rem 1.05rem;
     min-height: 182px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .summary-eyebrow {
@@ -259,7 +262,7 @@ html, body, [class*="css"] {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.75rem;
+    gap: 0.55rem;
     width: 100%;
     flex-wrap: nowrap;
     margin-top: auto;
@@ -294,7 +297,7 @@ html, body, [class*="css"] {
     min-width: 0;
     border: 1px solid rgba(74, 222, 128, 0.22);
     border-radius: 16px;
-    padding: 0.72rem 0.74rem;
+    padding: 0.66rem 0.68rem;
     background: rgba(14, 31, 22, 0.82);
     overflow: hidden;
     box-sizing: border-box;
@@ -302,15 +305,15 @@ html, body, [class*="css"] {
 
 .workflow-step-inner {
     display: flex;
-    align-items: flex-start;
-    gap: 0.55rem;
+    align-items: center;
+    gap: 0.48rem;
     min-width: 0;
     width: 100%;
 }
 
 .workflow-icon {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 999px;
     display: flex;
     align-items: center;
@@ -329,22 +332,18 @@ html, body, [class*="css"] {
 
 .workflow-label {
     color: var(--text);
-    font-size: 0.82rem;
+    font-size: clamp(0.72rem, 0.86vw, 0.82rem);
     font-weight: 800;
-    white-space: normal;
-    word-break: normal;
-    overflow-wrap: anywhere;
-    line-height: 1.18;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    text-wrap: balance;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-height: 1.1;
 }
 
 .workflow-status {
     color: var(--muted);
-    font-size: 0.68rem;
-    margin-top: 0.28rem;
+    font-size: 0.64rem;
+    margin-top: 0.18rem;
     white-space: nowrap;
 }
 
@@ -380,11 +379,11 @@ html, body, [class*="css"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 22px;
+    min-width: 14px;
     color: var(--primary);
     opacity: 0.45;
-    font-size: 1.1rem;
-    flex: 0 0 22px;
+    font-size: 0.95rem;
+    flex: 0 0 14px;
     align-self: center;
     overflow: hidden;
 }
