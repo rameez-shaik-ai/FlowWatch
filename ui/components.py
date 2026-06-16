@@ -265,7 +265,7 @@ def render_embedded_player_panel(
         if not stream_url.strip():
             st.warning("Add an HLS stream URL to render the embedded player.")
         else:
-            components.html(build_hls_player_html(stream_url), height=470)
+            components.html(build_hls_player_html(stream_url), height=590)
         st.caption(
             "The embedded player shows real browser playback metrics. In this prototype, Streamlit maps player conditions to dynamic QoE telemetry every few seconds. "
             "In production, these values would come directly from hls.js, Shaka, dash.js, OpenQoE, Mux Data, Bitmovin Analytics, or the operator's player SDK."

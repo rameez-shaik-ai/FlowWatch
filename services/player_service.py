@@ -61,42 +61,45 @@ def build_hls_player_html(stream_url: str) -> str:
             }}
             video {{
               width: 100%;
-              max-height: 320px;
+              max-height: 300px;
               border-radius: 16px;
               background: #000;
               display: block;
             }}
             .telemetry-panel {{
-              margin-top: 12px;
+              margin-top: 10px;
               display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-              gap: 10px;
+              grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+              gap: 8px;
             }}
             .metric {{
               background: rgba(14, 31, 22, 0.92);
               border: 1px solid rgba(74, 222, 128, 0.16);
               border-radius: 14px;
-              padding: 10px;
+              padding: 9px;
+              min-height: 66px;
+              box-sizing: border-box;
             }}
             .metric-label {{
-              font-size: 11px;
+              font-size: 10px;
               color: #a7f3d0;
-              margin-bottom: 6px;
+              margin-bottom: 5px;
               text-transform: uppercase;
               letter-spacing: 0.06em;
             }}
             .metric-value {{
-              font-size: 14px;
+              font-size: 13px;
               font-weight: 700;
               color: #f8fafc;
               word-break: break-word;
+              line-height: 1.25;
             }}
             .player-note {{
-              margin-top: 12px;
-              font-size: 12px;
+              margin-top: 10px;
+              font-size: 11px;
               color: #a7f3d0;
               line-height: 1.45;
-              padding: 10px 12px;
+              padding: 9px 11px;
               border-radius: 14px;
               background: rgba(34, 197, 94, 0.08);
               border: 1px solid rgba(74, 222, 128, 0.12);
