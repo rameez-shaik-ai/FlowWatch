@@ -9,6 +9,7 @@
       html, body {
         margin: 0;
         padding: 0;
+        min-height: 620px;
         background: transparent;
         font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
         color: #f8fafc;
@@ -19,6 +20,7 @@
         border-radius: 20px;
         padding: 14px;
         box-sizing: border-box;
+        min-height: 620px;
       }
       .player-title {
         display: flex;
@@ -322,6 +324,9 @@
       Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
       Streamlit.setComponentReady();
       Streamlit.setFrameHeight(620);
+      window.setInterval(() => {
+        Streamlit.setFrameHeight(document.documentElement.scrollHeight || 620);
+      }, 1500);
     </script>
   </body>
 </html>

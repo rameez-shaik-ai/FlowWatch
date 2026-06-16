@@ -285,6 +285,7 @@ def render_embedded_player_panel(
                 else 3000
                 if refresh_interval_label == "3 seconds"
                 else 5000,
+                height=620,
                 key=f"flowwatch-live-hls-{stream_url}",
             )
         else:

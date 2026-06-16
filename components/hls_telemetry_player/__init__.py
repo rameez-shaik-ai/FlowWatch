@@ -16,12 +16,13 @@ _component_func = components.declare_component(
 def hls_telemetry_player(
     stream_url: str,
     refresh_interval_ms: int = 2000,
+    height: int = 620,
     key: str | None = None,
 ) -> dict[str, Any] | None:
     return _component_func(
         stream_url=stream_url,
         refresh_interval_ms=refresh_interval_ms,
+        height=height,
         key=key,
         default=None,
     )
-
