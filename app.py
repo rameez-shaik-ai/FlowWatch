@@ -5,6 +5,10 @@ import time
 from typing import Any
 
 import streamlit as st
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:  # pragma: no cover - fallback for environments missing the optional package
+    st_autorefresh = None
 
 from agents.customer_care_agent import customer_care_agent
 from agents.diagnosis_agent import diagnosis_agent
@@ -16,9 +20,14 @@ from services.band_service import (
     create_band_event,
     run_band_publish,
 )
+from services.player_service import (
+    DEFAULT_HLS_STREAM_URL,
+    generate_dynamic_player_telemetry,
+)
 from services.telemetry_service import load_live_telemetry
 from ui.components import (
     render_compact_header,
+    render_embedded_player_panel,
     render_empty_state,
     render_kpi_cards,
     render_results_tabs,
@@ -38,9 +47,26 @@ def initialize_session_state() -> None:
         st.session_state.telemetry_source_mode = "Manual"
     if "telemetry_values" not in st.session_state:
         st.session_state.telemetry_values = DEFAULT_TELEMETRY.copy()
+    if "player_tick" not in st.session_state:
+        st.session_state.player_tick = 0
+    if "player_refresh_enabled" not in st.session_state:
+        st.session_state.player_refresh_enabled = True
+    if "player_refresh_interval_label" not in st.session_state:
+        st.session_state.player_refresh_interval_label = "3 seconds"
+    if "player_scenario" not in st.session_state:
+        st.session_state.player_scenario = "Auto"
+    if "player_stream_url" not in st.session_state:
+        st.session_state.player_stream_url = DEFAULT_HLS_STREAM_URL
+    if "player_auto_run_enabled" not in st.session_state:
+        st.session_state.player_auto_run_enabled = False
+    if "last_player_auto_run_ts" not in st.session_state:
+        st.session_state.last_player_auto_run_ts = 0.0
+    if "last_player_auto_run_key" not in st.session_state:
+        st.session_state.last_player_auto_run_key = ""
+    if "player_last_refresh_epoch" not in st.session_state:
+        st.session_state.player_last_refresh_epoch = time.time()
 
-
-def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
+def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
     with st.sidebar:
         st.markdown("### Model")
         selected_model = st.selectbox(
@@ -54,10 +80,24 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
         st.markdown("### Telemetry Source")
         st.session_state.telemetry_source_mode = st.radio(
             "Telemetry source",
-            ["Manual", "Live API fetch"],
-            index=0 if st.session_state.telemetry_source_mode == "Manual" else 1,
+            ["Manual", "Live API fetch", "Embedded HLS player"],
+            index=["Manual", "Live API fetch", "Embedded HLS player"].index(
+                st.session_state.telemetry_source_mode
+            ),
             label_visibility="collapsed",
         )
+
+        source_config = {
+            "mode": st.session_state.telemetry_source_mode,
+            "player_stream_url": st.session_state.player_stream_url,
+            "player_refresh_enabled": st.session_state.player_refresh_enabled,
+            "player_refresh_interval_label": st.session_state.player_refresh_interval_label,
+            "player_refresh_interval_ms": {"2 seconds": 2000, "3 seconds": 3000, "5 seconds": 5000}[
+                st.session_state.player_refresh_interval_label
+            ],
+            "player_scenario": st.session_state.player_scenario,
+            "player_auto_run_enabled": st.session_state.player_auto_run_enabled,
+        }
 
         if st.session_state.telemetry_source_mode == "Manual":
             random_col, ideal_col = st.columns(2, gap="small")
@@ -85,41 +125,103 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
                     st.session_state.telemetry_values = telemetry_data
                     st.success("Live telemetry loaded into the dashboard.")
 
+        if st.session_state.telemetry_source_mode == "Embedded HLS player":
+            st.markdown("### Player Mode")
+            st.session_state.player_stream_url = st.text_input(
+                "HLS stream URL",
+                value=st.session_state.player_stream_url,
+            )
+            st.session_state.player_refresh_enabled = st.toggle(
+                "Auto-refresh player telemetry",
+                value=st.session_state.player_refresh_enabled,
+            )
+            st.session_state.player_refresh_interval_label = st.selectbox(
+                "Refresh interval",
+                ["2 seconds", "3 seconds", "5 seconds"],
+                index=["2 seconds", "3 seconds", "5 seconds"].index(
+                    st.session_state.player_refresh_interval_label
+                ),
+            )
+            st.session_state.player_scenario = st.selectbox(
+                "Player telemetry scenario",
+                ["Auto", "Healthy", "Degraded", "Recovering"],
+                index=["Auto", "Healthy", "Degraded", "Recovering"].index(
+                    st.session_state.player_scenario
+                ),
+            )
+            st.session_state.player_auto_run_enabled = st.toggle(
+                "Auto-run agent analysis when QoE is Poor",
+                value=st.session_state.player_auto_run_enabled,
+            )
+            if st.button("Refresh player telemetry", use_container_width=True):
+                st.session_state.player_tick += 1
+                st.session_state.player_last_refresh_epoch = time.time()
+                st.rerun()
+            st.session_state.telemetry_values = generate_dynamic_player_telemetry(
+                st.session_state.player_tick,
+                st.session_state.player_scenario,
+            )
+            source_config = {
+                "mode": "Embedded HLS player",
+                "player_stream_url": st.session_state.player_stream_url,
+                "player_refresh_enabled": st.session_state.player_refresh_enabled,
+                "player_refresh_interval_label": st.session_state.player_refresh_interval_label,
+                "player_refresh_interval_ms": {
+                    "2 seconds": 2000,
+                    "3 seconds": 3000,
+                    "5 seconds": 5000,
+                }[st.session_state.player_refresh_interval_label],
+                "player_scenario": st.session_state.player_scenario,
+                "player_auto_run_enabled": st.session_state.player_auto_run_enabled,
+            }
+
         st.markdown("### Telemetry Fields")
         telemetry_defaults = st.session_state.telemetry_values
+        telemetry_disabled = st.session_state.telemetry_source_mode == "Embedded HLS player"
         telemetry = {
-            "customer_id": st.text_input("Customer ID", value=telemetry_defaults["customer_id"]),
-            "device_id": st.text_input("Device ID", value=telemetry_defaults["device_id"]),
-            "service": st.text_input("Service", value=telemetry_defaults["service"]),
+            "customer_id": st.text_input(
+                "Customer ID", value=telemetry_defaults["customer_id"], disabled=telemetry_disabled
+            ),
+            "device_id": st.text_input(
+                "Device ID", value=telemetry_defaults["device_id"], disabled=telemetry_disabled
+            ),
+            "service": st.text_input(
+                "Service", value=telemetry_defaults["service"], disabled=telemetry_disabled
+            ),
             "bitrate_mbps": st.number_input(
                 "Bitrate Mbps",
                 min_value=0.0,
                 value=float(telemetry_defaults["bitrate_mbps"]),
                 step=0.1,
+                disabled=telemetry_disabled,
             ),
             "buffering_ratio": st.number_input(
                 "Buffering ratio %",
                 min_value=0.0,
                 value=float(telemetry_defaults["buffering_ratio"]),
                 step=0.1,
+                disabled=telemetry_disabled,
             ),
             "latency_ms": st.number_input(
                 "Latency ms",
                 min_value=0,
                 value=int(telemetry_defaults["latency_ms"]),
                 step=1,
+                disabled=telemetry_disabled,
             ),
             "packet_loss": st.number_input(
                 "Packet loss %",
                 min_value=0.0,
                 value=float(telemetry_defaults["packet_loss"]),
                 step=0.1,
+                disabled=telemetry_disabled,
             ),
             "app_crashes": st.number_input(
                 "App crashes",
                 min_value=0,
                 value=int(telemetry_defaults["app_crashes"]),
                 step=1,
+                disabled=telemetry_disabled,
             ),
         }
 
@@ -134,6 +236,17 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
                 disabled=True,
                 help="Calculated automatically from bitrate, buffering, latency, packet loss, and app crashes.",
             )
+        elif st.session_state.telemetry_source_mode == "Embedded HLS player":
+            telemetry["qoe_score"] = int(telemetry_defaults["qoe_score"])
+            st.number_input(
+                "QoE score",
+                min_value=0,
+                max_value=100,
+                value=int(telemetry["qoe_score"]),
+                step=1,
+                disabled=True,
+                help="Mapped from the embedded player telemetry scenario for this prototype.",
+            )
         else:
             telemetry["qoe_score"] = st.number_input(
                 "QoE score",
@@ -146,7 +259,7 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any]]:
 
         st.session_state.telemetry_values = telemetry.copy()
 
-    return selected_model, telemetry
+    return selected_model, telemetry, source_config
 
 
 def extract_priority_level(customer_care_text: str | None) -> str:
@@ -168,6 +281,8 @@ def run_multi_agent_workflow(
     summary_placeholder,
     default_agent_states: dict[str, str],
     qoe_preview: dict[str, Any],
+    source_config: dict[str, Any],
+    auto_triggered: bool = False,
 ) -> None:
     room_id = f"band-room-{telemetry['customer_id'].lower()}"
     communication_log: list[dict[str, Any]] = []
@@ -227,6 +342,14 @@ def run_multi_agent_workflow(
             "latest_status": qoe_result["qoe_status"],
             "next_action": "Continue passive monitoring",
         }
+        if source_config["mode"] == "Embedded HLS player":
+            shared_context.update(
+                {
+                    "source": "Embedded HLS player",
+                    "trigger": "QoE degradation" if auto_triggered else "Manual review",
+                    "auto_triggered": auto_triggered,
+                }
+            )
         band_result = run_band_publish(
             band_config,
             telemetry,
@@ -406,6 +529,14 @@ def run_multi_agent_workflow(
         "selected_model": selected_model,
         "next_action": "Proactive outreach and continued monitoring",
     }
+    if source_config["mode"] == "Embedded HLS player":
+        shared_context.update(
+            {
+                "source": "Embedded HLS player",
+                "trigger": "QoE degradation" if auto_triggered else "Manual review",
+                "auto_triggered": auto_triggered,
+            }
+        )
     render_results_tabs(
         room_id=room_id,
         shared_context=shared_context,
@@ -426,14 +557,51 @@ def main() -> None:
     st.set_page_config(page_title="FlowWatch", page_icon="📺", layout="wide")
     apply_theme()
     initialize_session_state()
+
+    if (
+        st.session_state.telemetry_source_mode == "Embedded HLS player"
+        and st.session_state.player_refresh_enabled
+        and st_autorefresh is not None
+    ):
+        st.session_state.player_tick = st_autorefresh(
+            interval={
+                "2 seconds": 2000,
+                "3 seconds": 3000,
+                "5 seconds": 5000,
+            }[st.session_state.player_refresh_interval_label],
+            key="player_telemetry_refresh",
+        )
+        st.session_state.player_last_refresh_epoch = time.time()
+
     band_config = build_band_config()
-    selected_model, telemetry = render_sidebar_telemetry_inputs()
+    selected_model, telemetry, source_config = render_sidebar_telemetry_inputs()
     qoe_preview = qoe_monitoring_agent(telemetry)
 
     render_compact_header(
         band_config=band_config,
         aiml_ready=bool(get_secret("AIML_API_KEY")),
     )
+
+    if source_config["mode"] == "Embedded HLS player":
+        render_embedded_player_panel(
+            stream_url=source_config["player_stream_url"],
+            scenario=source_config["player_scenario"],
+            refresh_interval_label=source_config["player_refresh_interval_label"],
+            auto_refresh_enabled=source_config["player_refresh_enabled"],
+            auto_run_enabled=source_config["player_auto_run_enabled"],
+            telemetry=telemetry,
+            qoe_preview=qoe_preview,
+            refresh_epoch=st.session_state.player_last_refresh_epoch,
+        )
+
+        if qoe_preview["qoe_status"] in {"Poor", "Warning"}:
+            st.warning(
+                "Poor QoE detected from embedded player telemetry. FlowWatch can run agent analysis for this incident."
+            )
+        if st_autorefresh is None and source_config["player_refresh_enabled"]:
+            st.info(
+                "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
+            )
 
     default_agent_states = {
         "QoE Monitoring Agent": "waiting",
@@ -460,8 +628,30 @@ def main() -> None:
 
     render_kpi_cards(telemetry)
     run_clicked = render_run_control()
+    auto_triggered = False
 
-    if run_clicked:
+    if (
+        source_config["mode"] == "Embedded HLS player"
+        and source_config["player_auto_run_enabled"]
+        and qoe_preview["qoe_status"] in {"Poor", "Warning"}
+    ):
+        incident_key = (
+            f"{telemetry['customer_id']}|{telemetry['device_id']}|{qoe_preview['qoe_status']}|"
+            f"{source_config['player_scenario']}"
+        )
+        now = time.time()
+        if (
+            incident_key != st.session_state.last_player_auto_run_key
+            or now - st.session_state.last_player_auto_run_ts >= 30
+        ):
+            st.session_state.last_player_auto_run_key = incident_key
+            st.session_state.last_player_auto_run_ts = now
+            auto_triggered = True
+            st.info(
+                "Poor QoE detected from embedded player telemetry. FlowWatch analysis triggered."
+            )
+
+    if run_clicked or auto_triggered:
         run_multi_agent_workflow(
             telemetry=telemetry,
             selected_model=selected_model,
@@ -469,6 +659,8 @@ def main() -> None:
             summary_placeholder=summary_placeholder,
             default_agent_states=default_agent_states,
             qoe_preview=qoe_preview,
+            source_config=source_config,
+            auto_triggered=auto_triggered,
         )
     else:
         render_empty_state()

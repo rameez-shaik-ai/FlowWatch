@@ -8,6 +8,7 @@ FlowWatch is a hackathon-ready Streamlit prototype for proactive telecom TV stre
 - KPN/telecom-inspired UI theme
 - Manual telemetry input
 - Live API telemetry fetch
+- Embedded HLS player telemetry mode
 - Random telemetry generation
 - Ideal telemetry generation
 - QoE Monitoring Agent
@@ -31,6 +32,7 @@ FlowWatch/
     __init__.py
     aiml_api.py
     band_service.py
+    player_service.py
     telemetry_service.py
   agents/
     __init__.py
@@ -66,6 +68,8 @@ FlowWatch/
   Wraps AI/ML API calls and handles API error cases.
 - `services/band_service.py`
   Handles Band SDK setup, configuration, publishing, and graceful fallback if the SDK is unavailable.
+- `services/player_service.py`
+  Builds the embedded HLS player HTML and generates dynamic mapped telemetry for the player prototype mode.
 - `services/telemetry_service.py`
   Loads and validates telemetry from live endpoints.
 - `agents/`
@@ -94,6 +98,8 @@ pip install -r requirements.txt
 ```bash
 streamlit run app.py
 ```
+
+The embedded player mode uses `hls.js` in the browser and `streamlit-autorefresh` for periodic KPI refresh in Streamlit.
 
 ## Environment Variables
 
@@ -161,6 +167,54 @@ BAND_REST_URL = "https://app.band.ai"
 ```
 
 Streamlit Cloud redeploys automatically when a new commit reaches the selected branch.
+
+## Embedded HLS Player Mode
+
+FlowWatch now supports a third telemetry source: `Embedded HLS player`.
+
+Default stream:
+
+```text
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+```
+
+This mode is implemented in 3 practical hackathon phases:
+
+1. An embedded HLS video player is rendered in the dashboard.
+2. Browser-side JavaScript telemetry is shown inside the player component.
+3. Python-side FlowWatch telemetry is dynamically mapped and refreshed every few seconds.
+
+### What is real vs simulated in the prototype
+
+- Real in the browser:
+  - HLS playback
+  - Player state
+  - Current playback time
+  - Buffered-ahead seconds
+  - Resolution
+  - Frame counters when supported by the browser
+- Simulated/mapped in Streamlit:
+  - `bitrate_mbps`
+  - `buffering_ratio`
+  - `latency_ms`
+  - `packet_loss`
+  - `qoe_score`
+
+This keeps the prototype simple while still demonstrating how a production player SDK or custom bidirectional Streamlit component would feed real playback telemetry into the backend.
+
+### Embedded player controls
+
+When `Embedded HLS player` is selected, FlowWatch exposes:
+
+- HLS stream URL
+- Auto-refresh player telemetry
+- Refresh interval: 2s / 3s / 5s
+- Scenario: Auto / Healthy / Degraded / Recovering
+- Auto-run agent analysis when QoE becomes poor
+
+### Auto-analysis behavior
+
+If auto-analysis is enabled in embedded player mode, FlowWatch can trigger the agent workflow automatically when mapped QoE enters a warning or poor state. A cooldown is used to prevent repeated runs every refresh cycle.
 
 ## How The Workflow Works
 

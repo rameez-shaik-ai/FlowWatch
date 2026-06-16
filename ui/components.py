@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from html import escape
+import time
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from models import BandConfig
+from services.player_service import build_hls_player_html
 
 
 def render_status_chip(label: str, tone: str = "neutral") -> str:
@@ -61,6 +64,8 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
         "waiting": "Waiting",
         "active": "Running",
         "done": "Done",
+        "fallback_used": "Fallback",
+        "failed": "Failed",
     }
     for index, (agent_name, label, icon) in enumerate(steps):
         state = workflow_state.get(agent_name, "waiting")
@@ -76,7 +81,9 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
             f"</div>"
         )
         if index < len(steps) - 1:
-            connector_state = "active" if state in {"active", "done"} else "muted"
+            connector_state = (
+                "active" if state in {"active", "done", "fallback_used"} else "muted"
+            )
             parts.append(
                 f'<div class="flow-connector {connector_state}"><span>→</span></div>'
             )
@@ -206,6 +213,94 @@ def render_empty_state() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_embedded_player_panel(
+    *,
+    stream_url: str,
+    scenario: str,
+    refresh_interval_label: str,
+    auto_refresh_enabled: bool,
+    auto_run_enabled: bool,
+    telemetry: dict[str, Any],
+    qoe_preview: dict[str, Any],
+    refresh_epoch: float,
+) -> None:
+    qoe_status = qoe_preview["qoe_status"]
+    qoe_tone = {
+        "Good": "success",
+        "Warning": "warning",
+        "Poor": "critical",
+    }.get(qoe_status, "neutral")
+    next_action = (
+        "Auto-analysis armed"
+        if auto_run_enabled and qoe_status in {"Poor", "Warning"}
+        else "Monitoring embedded player telemetry"
+        if qoe_status == "Good"
+        else "Run FlowWatch analysis"
+    )
+
+    left, right = st.columns([1.7, 1], gap="large")
+    with left:
+        st.markdown(
+            f"""
+            <div class="player-wrapper">
+                <div class="player-panel-head">
+                    <div>
+                        <p class="summary-eyebrow">Embedded HLS Player</p>
+                        <p class="player-panel-copy">
+                            Live browser playback preview with JavaScript telemetry inside the player.
+                        </p>
+                    </div>
+                    <div class="player-panel-meta">
+                        {render_status_chip(f"Scenario: {scenario}", "success")}
+                        {render_status_chip(f"Refresh: {refresh_interval_label if auto_refresh_enabled else 'Manual'}", "info")}
+                        {render_status_chip(f"Auto-analysis: {'On' if auto_run_enabled else 'Off'}", "neutral")}
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if not stream_url.strip():
+            st.warning("Add an HLS stream URL to render the embedded player.")
+        else:
+            components.html(build_hls_player_html(stream_url), height=470)
+        st.caption(
+            "The embedded player shows real browser playback metrics. In this prototype, Streamlit maps player conditions to dynamic QoE telemetry every few seconds. "
+            "In production, these values would come directly from hls.js, Shaka, dash.js, OpenQoE, Mux Data, Bitmovin Analytics, or the operator's player SDK."
+        )
+
+    refresh_label = "Just now"
+    if refresh_epoch:
+        refresh_label = f"{max(0, int(time.time() - refresh_epoch))}s ago"
+
+    with right:
+        st.markdown(
+            f"""
+            <div class="summary-card mapped-telemetry-card">
+                <p class="summary-eyebrow">Mapped FlowWatch Telemetry</p>
+                <div class="mapped-qoe-row">
+                    <div class="mapped-score">{int(telemetry['qoe_score'])}</div>
+                    <div class="mapped-qoe-copy">
+                        {render_status_chip(qoe_status, qoe_tone)}
+                        <p class="mapped-next-action">{escape(next_action)}</p>
+                    </div>
+                </div>
+                <div class="mapped-grid">
+                    <div><span>Customer</span><strong>{escape(str(telemetry['customer_id']))}</strong></div>
+                    <div><span>Device</span><strong>{escape(str(telemetry['device_id']))}</strong></div>
+                    <div><span>Service</span><strong>{escape(str(telemetry['service']))}</strong></div>
+                    <div><span>Last refresh</span><strong>{escape(refresh_label)}</strong></div>
+                    <div><span>Bitrate</span><strong>{float(telemetry['bitrate_mbps']):.1f} Mbps</strong></div>
+                    <div><span>Buffering</span><strong>{float(telemetry['buffering_ratio']):.1f}%</strong></div>
+                    <div><span>Latency</span><strong>{int(telemetry['latency_ms'])} ms</strong></div>
+                    <div><span>Packet loss</span><strong>{float(telemetry['packet_loss']):.1f}%</strong></div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def render_results_tabs(

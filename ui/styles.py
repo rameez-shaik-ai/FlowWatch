@@ -364,8 +364,20 @@ html, body, [class*="css"] {
     background: rgba(22, 101, 52, 0.22);
 }
 
+.workflow-step.fallback_used {
+    border-color: color-mix(in srgb, var(--warning) 55%, transparent);
+    background: color-mix(in srgb, var(--warning) 12%, var(--surface) 88%);
+}
+
+.workflow-step.failed {
+    border-color: color-mix(in srgb, var(--critical) 55%, transparent);
+    background: color-mix(in srgb, var(--critical) 12%, var(--surface) 88%);
+}
+
 .workflow-step.done .workflow-icon,
-.workflow-step.active .workflow-icon {
+.workflow-step.active .workflow-icon,
+.workflow-step.fallback_used .workflow-icon,
+.workflow-step.failed .workflow-icon {
     background: rgba(34, 197, 94, 0.18);
     border-color: rgba(34, 197, 94, 0.4);
 }
@@ -434,6 +446,68 @@ html, body, [class*="css"] {
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
+}
+
+.mapped-telemetry-card {
+    min-height: 470px;
+    gap: 1rem;
+}
+
+.mapped-qoe-row {
+    display: flex;
+    gap: 0.85rem;
+    align-items: center;
+}
+
+.mapped-score {
+    font-size: 2.8rem;
+    line-height: 1;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.mapped-qoe-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mapped-next-action {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.mapped-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem 0.8rem;
+}
+
+.mapped-grid div {
+    padding: 0.72rem 0.8rem;
+    border-radius: 14px;
+    border: 1px solid rgba(74, 222, 128, 0.14);
+    background: rgba(34, 197, 94, 0.05);
+    min-width: 0;
+}
+
+.mapped-grid span {
+    display: block;
+    margin-bottom: 0.22rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.mapped-grid strong {
+    display: block;
+    color: var(--text);
+    font-size: 0.88rem;
+    line-height: 1.35;
+    word-break: break-word;
 }
 
 .kpi-card {
@@ -578,6 +652,43 @@ html, body, [class*="css"] {
     color: var(--text);
 }
 
+.player-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    box-shadow: var(--shadow);
+    padding: 1rem 1.05rem 0.85rem 1.05rem;
+    margin-top: 1rem;
+}
+
+.player-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.player-panel-copy {
+    margin: 0.3rem 0 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.player-panel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+
+@media (max-width: 980px) {
+    .mapped-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 [data-testid="stExpander"] {
     overflow: hidden;
 }
@@ -645,6 +756,14 @@ html, body, [class*="css"] {
 
     .workflow-step {
         min-width: 170px;
+    }
+
+    .player-panel-head {
+        flex-direction: column;
+    }
+
+    .player-panel-meta {
+        justify-content: flex-start;
     }
 }
 </style>
