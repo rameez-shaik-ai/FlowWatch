@@ -294,7 +294,7 @@ html, body, [class*="css"] {
     min-width: 0;
     border: 1px solid rgba(74, 222, 128, 0.22);
     border-radius: 16px;
-    padding: 0.78rem 0.82rem;
+    padding: 0.72rem 0.74rem;
     background: rgba(14, 31, 22, 0.82);
     overflow: hidden;
     box-sizing: border-box;
@@ -302,15 +302,15 @@ html, body, [class*="css"] {
 
 .workflow-step-inner {
     display: flex;
-    align-items: center;
-    gap: 0.65rem;
+    align-items: flex-start;
+    gap: 0.55rem;
     min-width: 0;
     width: 100%;
 }
 
 .workflow-icon {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 999px;
     display: flex;
     align-items: center;
@@ -329,23 +329,23 @@ html, body, [class*="css"] {
 
 .workflow-label {
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 800;
-    white-space: nowrap;
-    word-break: keep-all;
-    overflow-wrap: normal;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.18;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-wrap: balance;
 }
 
 .workflow-status {
     color: var(--muted);
-    font-size: 0.74rem;
-    margin-top: 0.2rem;
+    font-size: 0.68rem;
+    margin-top: 0.28rem;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .workflow-step.waiting {
@@ -603,7 +603,7 @@ html, body, [class*="css"] {
     .workflow-step {
         flex: 1 1 calc(50% - 0.4rem);
         width: auto;
-        min-width: 220px;
+        min-width: 210px;
     }
 
     .workflow-topline {
@@ -631,7 +631,7 @@ html, body, [class*="css"] {
     }
 
     .workflow-step {
-        min-width: 180px;
+        min-width: 170px;
     }
 }
 
@@ -645,7 +645,7 @@ html, body, [class*="css"] {
     }
 
     .workflow-step {
-        min-width: 180px;
+        min-width: 170px;
     }
 }
 </style>
