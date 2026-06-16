@@ -256,7 +256,7 @@ html, body, [class*="css"] {
 
 .workflow-stepper {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     width: 100%;
@@ -267,13 +267,14 @@ html, body, [class*="css"] {
 .workflow-step {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
     flex: 1;
+    min-width: 0;
     min-width: 120px;
     border: 1px solid rgba(74, 222, 128, 0.22);
     border-radius: 16px;
     padding: 0.85rem 0.9rem;
     background: rgba(14, 31, 22, 0.82);
+    overflow: hidden;
 }
 
 .workflow-step-inner {
@@ -299,6 +300,7 @@ html, body, [class*="css"] {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
 }
 
 .workflow-label {
@@ -348,6 +350,7 @@ html, body, [class*="css"] {
     opacity: 0.45;
     font-size: 1.4rem;
     flex: 0 0 36px;
+    align-self: center;
 }
 
 .flow-connector.active {

@@ -59,25 +59,22 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
     parts: list[str] = []
     for index, (agent_name, label, icon) in enumerate(steps):
         state = workflow_state.get(agent_name, "waiting")
-        connector_state = "active" if state in {"active", "done"} else "muted"
-        connector = (
-            f'<div class="flow-connector {connector_state}"><span>→</span></div>'
-            if index < len(steps) - 1
-            else ""
-        )
         parts.append(
-            (
-                f'<div class="workflow-step {state}">'
-                f'<div class="workflow-step-inner">'
-                f'<div class="workflow-icon">{icon}</div>'
-                f'<div class="workflow-copy">'
-                f'<span class="workflow-label">{label}</span>'
-                f'<span class="workflow-status">{state.title()}</span>'
-                f"</div>"
-                f"</div>"
-                f"{connector}"
-            )
+            f'<div class="workflow-step {state}">'
+            f'<div class="workflow-step-inner">'
+            f'<div class="workflow-icon">{icon}</div>'
+            f'<div class="workflow-copy">'
+            f'<span class="workflow-label">{label}</span>'
+            f'<span class="workflow-status">{state.title()}</span>'
+            f"</div>"
+            f"</div>"
+            f"</div>"
         )
+        if index < len(steps) - 1:
+            connector_state = "active" if state in {"active", "done"} else "muted"
+            parts.append(
+                f'<div class="flow-connector {connector_state}"><span>→</span></div>'
+            )
     return f'<div class="workflow-stepper">{"".join(parts)}</div>'
 
 
