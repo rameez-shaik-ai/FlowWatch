@@ -53,26 +53,32 @@ def render_workflow_stepper(workflow_state: dict[str, str]) -> str:
     steps = [
         ("QoE Monitoring Agent", "Monitor", "📡"),
         ("Diagnosis Agent", "Diagnose", "🧠"),
-        ("Recovery Action Agent", "Recover", "🛠"),
+        ("Recovery Action Agent", "Recover", "🛠️"),
         ("Customer Care Agent", "Communicate", "💬"),
     ]
     parts: list[str] = []
     for index, (agent_name, label, icon) in enumerate(steps):
         state = workflow_state.get(agent_name, "waiting")
-        connector = '<span class="step-connector"></span>' if index < len(steps) - 1 else ""
+        connector_state = "active" if state in {"active", "done"} else "muted"
+        connector = (
+            f'<div class="flow-connector {connector_state}"><span>→</span></div>'
+            if index < len(steps) - 1
+            else ""
+        )
         parts.append(
             (
-                f'<div class="step-item {state}">'
-                f'<div class="step-node">{icon}</div>'
-                f'<div class="step-copy">'
-                f'<span class="step-label">{label}</span>'
-                f'<span class="step-state">{state.title()}</span>'
+                f'<div class="workflow-step {state}">'
+                f'<div class="workflow-step-inner">'
+                f'<div class="workflow-icon">{icon}</div>'
+                f'<div class="workflow-copy">'
+                f'<span class="workflow-label">{label}</span>'
+                f'<span class="workflow-status">{state.title()}</span>'
                 f"</div>"
                 f"</div>"
                 f"{connector}"
             )
         )
-    return "".join(parts)
+    return f'<div class="workflow-stepper">{"".join(parts)}</div>'
 
 
 def render_top_summary_cards(
@@ -96,7 +102,7 @@ def render_top_summary_cards(
         "band": "Enabled" if band_config.enabled else "Disabled",
     }
 
-    cols = st.columns(3, gap="medium")
+    cols = st.columns([1.05, 1.55, 1.15], gap="large")
     cols[0].markdown(
         f"""
         <div class="summary-card incident-card {qoe_status}">
@@ -117,9 +123,7 @@ def render_top_summary_cards(
         f"""
         <div class="summary-card workflow-card">
             <p class="summary-eyebrow">Agent Workflow</p>
-            <div class="stepper-shell">
-                {render_workflow_stepper(workflow_state)}
-            </div>
+            {render_workflow_stepper(workflow_state)}
         </div>
         """,
         unsafe_allow_html=True,
@@ -182,11 +186,13 @@ def render_kpi_cards(telemetry: dict[str, Any]) -> None:
 
 
 def render_run_control() -> bool:
-    return st.button(
-        "Run FlowWatch Analysis",
-        type="primary",
-        use_container_width=True,
-    )
+    left, center, right = st.columns([1, 1.2, 1], gap="large")
+    with center:
+        return st.button(
+            "Run FlowWatch Analysis",
+            type="primary",
+            use_container_width=True,
+        )
 
 
 def render_empty_state() -> None:

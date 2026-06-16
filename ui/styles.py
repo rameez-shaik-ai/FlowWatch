@@ -204,7 +204,7 @@ html, body, [class*="css"] {
 
 .summary-card {
     padding: 1rem 1.05rem;
-    min-height: 198px;
+    min-height: 182px;
 }
 
 .summary-eyebrow {
@@ -251,67 +251,119 @@ html, body, [class*="css"] {
 .workflow-card {
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
 }
 
-.stepper-shell {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-    gap: 0.45rem;
-    align-items: center;
+.workflow-stepper {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    flex-wrap: nowrap;
     margin-top: auto;
 }
 
-.step-item {
+.workflow-step {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 120px;
+    border: 1px solid rgba(74, 222, 128, 0.22);
+    border-radius: 16px;
+    padding: 0.85rem 0.9rem;
+    background: rgba(14, 31, 22, 0.82);
+}
+
+.workflow-step-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
     min-width: 0;
 }
 
-.step-node {
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
+.workflow-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--surface2) 65%, transparent);
-    border: 1px solid var(--border);
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    flex-shrink: 0;
 }
 
-.step-copy {
+.workflow-copy {
     display: flex;
     flex-direction: column;
     min-width: 0;
 }
 
-.step-label {
+.workflow-label {
     color: var(--text);
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-size: 0.95rem;
+    font-weight: 800;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
 }
 
-.step-state {
+.workflow-status {
     color: var(--muted);
-    font-size: 0.72rem;
+    font-size: 0.78rem;
+    margin-top: 0.2rem;
+    white-space: nowrap;
 }
 
-.step-item.done .step-node {
-    background: var(--primary-soft);
+.workflow-step.waiting {
+    opacity: 0.75;
+}
+
+.workflow-step.active {
+    border-color: rgba(34, 197, 94, 0.75);
+    box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.22),
+        0 16px 40px rgba(34, 197, 94, 0.12);
+}
+
+.workflow-step.done {
+    border-color: rgba(34, 197, 94, 0.55);
+    background: rgba(22, 101, 52, 0.22);
+}
+
+.workflow-step.done .workflow-icon,
+.workflow-step.active .workflow-icon {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+.flow-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
     color: var(--primary);
+    opacity: 0.45;
+    font-size: 1.4rem;
+    flex: 0 0 36px;
 }
 
-.step-item.active .step-node {
-    background: color-mix(in srgb, var(--blue) 16%, transparent);
-    color: var(--blue);
-    border-color: color-mix(in srgb, var(--blue) 35%, transparent);
+.flow-connector.active {
+    opacity: 0.8;
+    animation: pulseArrow 1.4s ease-in-out infinite;
 }
 
-.step-connector {
-    height: 2px;
-    width: 100%;
-    background: color-mix(in srgb, var(--muted) 28%, transparent);
-    border-radius: 999px;
+@keyframes pulseArrow {
+    0%, 100% {
+        opacity: 0.45;
+        transform: translateX(0);
+    }
+    50% {
+        opacity: 1;
+        transform: translateX(3px);
+    }
 }
 
 .action-card h3 {
@@ -396,9 +448,10 @@ html, body, [class*="css"] {
     color: #ffffff;
     font-weight: 700;
     border-radius: 16px;
-    padding: 0.72rem 1rem;
-    min-height: 3rem;
+    padding: 0.52rem 0.95rem;
+    min-height: 2.45rem;
     box-shadow: 0 10px 22px color-mix(in srgb, var(--primary) 24%, transparent);
+    font-size: 0.92rem;
 }
 
 [data-testid="stButton"] > button:hover {
@@ -496,12 +549,30 @@ html, body, [class*="css"] {
         justify-content: flex-start;
     }
 
-    .stepper-shell {
-        grid-template-columns: 1fr;
+    .workflow-stepper {
+        flex-wrap: wrap;
     }
 
-    .step-connector {
+    .flow-connector {
         display: none;
+    }
+
+    .workflow-step {
+        min-width: 180px;
+    }
+}
+
+@media (max-width: 1100px) {
+    .workflow-stepper {
+        flex-wrap: wrap;
+    }
+
+    .flow-connector {
+        display: none;
+    }
+
+    .workflow-step {
+        min-width: 180px;
     }
 }
 </style>
