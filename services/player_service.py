@@ -342,3 +342,85 @@ def generate_dynamic_player_telemetry(tick: int, scenario: str = "Auto") -> dict
 
     telemetry["qoe_score"] = calculate_qoe_score(telemetry)
     return telemetry
+
+
+def map_live_player_metrics_to_telemetry(
+    metrics: dict[str, Any] | None,
+    previous_telemetry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    previous = previous_telemetry or get_initial_player_telemetry()
+    if not metrics:
+        return previous.copy()
+
+    resolution = str(metrics.get("resolution") or "unknown")
+    bitrate_lookup = {
+        "1920x1080": 6.0,
+        "1280x720": 3.5,
+        "854x480": 1.8,
+        "640x360": 1.0,
+    }
+    bitrate_mbps = bitrate_lookup.get(
+        resolution, float(previous.get("bitrate_mbps", 3.0))
+    )
+
+    player_state = str(metrics.get("player_state") or "idle")
+    buffered_ahead_seconds = float(metrics.get("buffered_ahead_seconds", 0.0) or 0.0)
+    playback_time_moving = bool(metrics.get("playback_time_moving", False))
+
+    if player_state in {"buffering", "waiting"} and not playback_time_moving:
+        buffering_ratio = 8.0
+    elif buffered_ahead_seconds < 3:
+        buffering_ratio = 6.5
+    elif buffered_ahead_seconds < 5:
+        buffering_ratio = 4.0
+    elif buffered_ahead_seconds < 10:
+        buffering_ratio = 2.0
+    else:
+        buffering_ratio = 0.8
+
+    if player_state == "error":
+        latency_ms = 250
+    elif buffered_ahead_seconds < 3:
+        latency_ms = 190
+    elif buffered_ahead_seconds < 5:
+        latency_ms = 150
+    elif buffered_ahead_seconds < 10:
+        latency_ms = 110
+    else:
+        latency_ms = 65
+
+    dropped_frames = int(metrics.get("dropped_frames", 0) or 0)
+    total_frames = int(metrics.get("total_frames", 0) or 0)
+    dropped_frame_ratio = (dropped_frames / total_frames) if total_frames > 0 else 0.0
+    if dropped_frame_ratio >= 0.05:
+        packet_loss = 3.5
+    elif dropped_frame_ratio >= 0.03:
+        packet_loss = 2.5
+    elif dropped_frame_ratio >= 0.02:
+        packet_loss = 1.5
+    else:
+        packet_loss = 0.4
+
+    telemetry = {
+        "customer_id": "LIVE_PLAYER_001",
+        "device_id": "BROWSER_HLS_PLAYER",
+        "service": "Embedded HLS stream",
+        "bitrate_mbps": bitrate_mbps,
+        "buffering_ratio": buffering_ratio,
+        "latency_ms": latency_ms,
+        "packet_loss": packet_loss,
+        "app_crashes": 1 if player_state == "error" else 0,
+        "player_state": player_state,
+        "playback_time_seconds": float(metrics.get("playback_time_seconds", 0.0) or 0.0),
+        "buffered_ahead_seconds": buffered_ahead_seconds,
+        "resolution": resolution,
+        "dropped_frames": dropped_frames,
+        "total_frames": total_frames,
+        "ready_state": int(metrics.get("ready_state", 0) or 0),
+        "network_state": int(metrics.get("network_state", 0) or 0),
+        "stall_count": int(metrics.get("stall_count", 0) or 0),
+        "playback_time_moving": playback_time_moving,
+        "last_update_epoch_ms": int(metrics.get("last_update_epoch_ms", 0) or 0),
+    }
+    telemetry["qoe_score"] = calculate_qoe_score(telemetry)
+    return telemetry

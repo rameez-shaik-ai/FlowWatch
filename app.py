@@ -24,6 +24,8 @@ from services.playback_impact_gate import evaluate_playback_impact
 from services.player_service import (
     DEFAULT_HLS_STREAM_URL,
     generate_dynamic_player_telemetry,
+    get_initial_player_telemetry,
+    map_live_player_metrics_to_telemetry,
 )
 from services.telemetry_service import load_live_telemetry
 from ui.components import (
@@ -66,6 +68,8 @@ def initialize_session_state() -> None:
         st.session_state.last_player_auto_run_key = ""
     if "player_last_refresh_epoch" not in st.session_state:
         st.session_state.player_last_refresh_epoch = time.time()
+    if "live_player_metrics" not in st.session_state:
+        st.session_state.live_player_metrics = None
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
     with st.sidebar:
@@ -145,8 +149,8 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             )
             st.session_state.player_scenario = st.selectbox(
                 "Player telemetry scenario",
-                ["Auto", "Healthy", "Degraded", "Recovering"],
-                index=["Auto", "Healthy", "Degraded", "Recovering"].index(
+                ["Auto", "Healthy", "Degraded", "Recovering", "Live"],
+                index=["Auto", "Healthy", "Degraded", "Recovering", "Live"].index(
                     st.session_state.player_scenario
                 ),
             )
@@ -158,10 +162,13 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
                 st.session_state.player_tick += 1
                 st.session_state.player_last_refresh_epoch = time.time()
                 st.rerun()
-            st.session_state.telemetry_values = generate_dynamic_player_telemetry(
-                st.session_state.player_tick,
-                st.session_state.player_scenario,
-            )
+            if st.session_state.player_scenario != "Live":
+                st.session_state.telemetry_values = generate_dynamic_player_telemetry(
+                    st.session_state.player_tick,
+                    st.session_state.player_scenario,
+                )
+            elif "player_state" not in st.session_state.telemetry_values:
+                st.session_state.telemetry_values = get_initial_player_telemetry()
             source_config = {
                 "mode": "Embedded HLS player",
                 "player_stream_url": st.session_state.player_stream_url,
@@ -666,6 +673,7 @@ def main() -> None:
     if (
         st.session_state.telemetry_source_mode == "Embedded HLS player"
         and st.session_state.player_refresh_enabled
+        and st.session_state.player_scenario != "Live"
         and st_autorefresh is not None
     ):
         st.session_state.player_tick = st_autorefresh(
@@ -680,6 +688,24 @@ def main() -> None:
 
     band_config = build_band_config()
     selected_model, telemetry, source_config = render_sidebar_telemetry_inputs()
+    live_metrics_status = None
+    if (
+        source_config["mode"] == "Embedded HLS player"
+        and source_config["player_scenario"] == "Live"
+    ):
+        latest_live_metrics = st.session_state.live_player_metrics
+        if latest_live_metrics and (
+            int(latest_live_metrics.get("last_update_epoch_ms", 0) or 0)
+            >= int((time.time() - 6) * 1000)
+        ):
+            live_metrics_status = "received"
+        else:
+            live_metrics_status = "waiting"
+        telemetry = map_live_player_metrics_to_telemetry(
+            st.session_state.live_player_metrics,
+            st.session_state.telemetry_values,
+        )
+        st.session_state.telemetry_values = telemetry.copy()
     qoe_preview = qoe_monitoring_agent(telemetry)
     playback_impact = None
     if source_config["mode"] == "Embedded HLS player":
@@ -691,7 +717,7 @@ def main() -> None:
     )
 
     if source_config["mode"] == "Embedded HLS player":
-        render_embedded_player_panel(
+        live_metrics = render_embedded_player_panel(
             stream_url=source_config["player_stream_url"],
             scenario=source_config["player_scenario"],
             refresh_interval_label=source_config["player_refresh_interval_label"],
@@ -701,8 +727,17 @@ def main() -> None:
             qoe_preview=qoe_preview,
             refresh_epoch=st.session_state.player_last_refresh_epoch,
             playback_impact=playback_impact,
+            live_metrics_status=live_metrics_status,
         )
-        if st_autorefresh is None and source_config["player_refresh_enabled"]:
+        if source_config["player_scenario"] == "Live":
+            if live_metrics is not None:
+                st.session_state.live_player_metrics = live_metrics
+                st.session_state.player_last_refresh_epoch = time.time()
+        if (
+            st_autorefresh is None
+            and source_config["player_refresh_enabled"]
+            and source_config["player_scenario"] != "Live"
+        ):
             st.info(
                 "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
             )

@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
+from components.hls_telemetry_player import hls_telemetry_player
 from models import BandConfig
 from services.player_service import build_hls_player_html
 
@@ -232,7 +233,8 @@ def render_embedded_player_panel(
     qoe_preview: dict[str, Any],
     refresh_epoch: float,
     playback_impact: dict[str, Any] | None = None,
-) -> None:
+    live_metrics_status: str | None = None,
+) -> dict[str, Any] | None:
     qoe_status = qoe_preview["qoe_status"]
     qoe_tone = {
         "Good": "success",
@@ -251,6 +253,7 @@ def render_embedded_player_panel(
     dropped_frame_ratio = float(impact.get("dropped_frame_ratio", 0.0)) * 100
 
     left, right = st.columns([1.7, 1], gap="large")
+    live_metrics = None
     with left:
         st.markdown(
             f"""
@@ -274,8 +277,26 @@ def render_embedded_player_panel(
         )
         if not stream_url.strip():
             st.warning("Add an HLS stream URL to render the embedded player.")
+        elif scenario == "Live":
+            live_metrics = hls_telemetry_player(
+                stream_url=stream_url,
+                refresh_interval_ms=2000
+                if refresh_interval_label == "2 seconds"
+                else 3000
+                if refresh_interval_label == "3 seconds"
+                else 5000,
+                key=f"flowwatch-live-hls-{stream_url}",
+            )
         else:
             components.html(build_hls_player_html(stream_url), height=590)
+        if scenario == "Live":
+            tone = "success" if live_metrics_status == "received" else "neutral"
+            label = (
+                "Live player metrics received"
+                if live_metrics_status == "received"
+                else "Waiting for live player metrics. Press play on the video."
+            )
+            st.markdown(render_status_chip(label, tone), unsafe_allow_html=True)
 
     refresh_label = "Just now"
     if refresh_epoch:
@@ -320,6 +341,7 @@ def render_embedded_player_panel(
             with st.expander("Why this decision?"):
                 for reason in impact_reasons:
                     st.markdown(f"- {reason}")
+    return live_metrics
 
 
 def render_results_tabs(

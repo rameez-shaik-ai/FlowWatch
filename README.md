@@ -27,6 +27,12 @@ FlowWatch is a hackathon-ready Streamlit prototype for proactive telecom TV stre
 FlowWatch/
   app.py
   config.py
+  components/
+    __init__.py
+    hls_telemetry_player/
+      __init__.py
+      frontend/
+        index.html
   models.py
   services/
     __init__.py
@@ -63,6 +69,8 @@ FlowWatch/
   Coordinates Streamlit page setup, sidebar input flow, workflow execution, and result rendering.
 - `config.py`
   Holds constants and the secret-loading helper.
+- `components/hls_telemetry_player/`
+  Hosts the custom Streamlit component that streams live HLS browser metrics back into Python.
 - `models.py`
   Holds shared dataclasses used by the Band layer.
 - `services/aiml_api.py`
@@ -212,7 +220,7 @@ When `Embedded HLS player` is selected, FlowWatch exposes:
 - HLS stream URL
 - Auto-refresh player telemetry
 - Refresh interval: 2s / 3s / 5s
-- Scenario: Auto / Healthy / Degraded / Recovering
+- Scenario: Auto / Healthy / Degraded / Recovering / Live
 - Auto-run agent analysis when QoE becomes poor
 
 ### Auto-analysis behavior
@@ -234,6 +242,16 @@ FlowWatch now checks player smoothness signals before triggering agents in embed
 - player errors
 
 If QoE is risky but playback is still smooth, FlowWatch continues monitoring. Agents trigger only when playback impact is confirmed or critical.
+
+## Live HLS Player Telemetry
+
+Live mode uses a custom Streamlit component backed by `hls.js`.
+
+- The browser player collects playback metrics every 2 seconds.
+- Those metrics are passed into Python and used by the Playback Impact Gate.
+- QoE, KPI cards, and trigger decisions update from live player behavior.
+- True packet loss and network latency are still estimated in the demo from player behavior.
+- In production, those values would come from CDN, device, and network telemetry.
 
 ## How The Workflow Works
 
