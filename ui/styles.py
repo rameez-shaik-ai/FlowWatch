@@ -262,6 +262,17 @@ html, body, [class*="css"] {
     margin: 0.75rem 0 1rem 0;
 }
 
+.dashboard-card {
+    min-height: 128px;
+}
+
+.dashboard-value {
+    font-size: 1.05rem;
+    line-height: 1.35;
+    font-weight: 700;
+    color: var(--text);
+}
+
 .workflow-stepper {
     display: flex;
     align-items: center;

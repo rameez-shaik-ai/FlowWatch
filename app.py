@@ -38,7 +38,7 @@ from services.player_service import (
 from services.telemetry_service import load_live_telemetry
 from ui.components import (
     render_compact_header,
-    render_commander_decision_card,
+    render_decision_dashboard,
     render_embedded_player_panel,
     render_empty_state,
     render_kpi_cards,
@@ -56,6 +56,7 @@ from utils.qoe_scoring import (
 )
 from workflow.autonomous_orchestrator import (
     get_action_summary_from_commander,
+    is_self_healing_eligible,
     should_run_agent,
 )
 
@@ -99,6 +100,21 @@ def initialize_session_state() -> None:
         st.session_state.post_healing_playback_impact = None
     if "self_healing_log" not in st.session_state:
         st.session_state.self_healing_log = []
+    if "workflow_visible" not in st.session_state:
+        st.session_state.workflow_visible = False
+
+
+def reset_demo_state() -> None:
+    st.session_state.self_healing_status = "none"
+    st.session_state.self_healing_action = None
+    st.session_state.self_healing_result = None
+    st.session_state.post_healing_telemetry = None
+    st.session_state.post_healing_playback_impact = None
+    st.session_state.self_healing_log = []
+    st.session_state.commander_decision = None
+    st.session_state.last_player_auto_run_key = ""
+    st.session_state.last_player_auto_run_ts = 0.0
+    st.session_state.workflow_visible = False
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
     with st.sidebar:
@@ -120,6 +136,9 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             ),
             label_visibility="collapsed",
         )
+        if st.button("Reset demo", use_container_width=True):
+            reset_demo_state()
+            st.rerun()
 
         source_config = {
             "mode": st.session_state.telemetry_source_mode,
@@ -786,10 +805,14 @@ def main() -> None:
         requested_healing_action
     )
     st.session_state.commander_decision = commander_decision
-    if (
-        commander_decision.get("recommended_healing_action") != "none"
-        and st.session_state.self_healing_status not in {"completed", "rejected"}
-    ):
+    self_healing_eligible = is_self_healing_eligible(
+        source_config=source_config,
+        telemetry=telemetry,
+        qoe_preview=qoe_preview,
+        playback_impact=playback_impact,
+        commander_decision=commander_decision,
+    )
+    if self_healing_eligible and st.session_state.self_healing_status in {"none", "pending"}:
         st.session_state.self_healing_status = "pending"
         st.session_state.self_healing_result = {
             "action": commander_decision["recommended_healing_action"],
@@ -815,6 +838,11 @@ def main() -> None:
                 payload=st.session_state.self_healing_result,
             )
         ]
+    elif not self_healing_eligible and st.session_state.self_healing_status == "pending":
+        st.session_state.self_healing_status = "none"
+        st.session_state.self_healing_action = None
+        st.session_state.self_healing_result = None
+        st.session_state.self_healing_log = []
 
     render_compact_header(
         band_config=band_config,
@@ -852,16 +880,23 @@ def main() -> None:
                 "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
             )
 
-    render_commander_decision_card(commander_decision)
+    render_decision_dashboard(
+        telemetry=telemetry,
+        qoe_preview=qoe_preview,
+        playback_impact=playback_impact,
+        commander_decision=commander_decision,
+        source_config=source_config,
+    )
 
     approval_response = None
-    if st.session_state.self_healing_status not in {"completed", "rejected"}:
+    if self_healing_eligible and st.session_state.self_healing_status == "pending":
         approval_response = render_self_healing_approval_card(commander_decision)
     if approval_response == "approved":
         action = commander_decision["recommended_healing_action"]
         action_label = get_healing_action_label(action)
         st.session_state.self_healing_status = "approved"
         st.session_state.self_healing_action = action
+        st.session_state.workflow_visible = True
         st.session_state.self_healing_log.append(
             create_band_event(
                 step=len(st.session_state.self_healing_log) + 1,
@@ -933,6 +968,7 @@ def main() -> None:
     elif approval_response == "rejected":
         st.session_state.self_healing_status = "rejected"
         st.session_state.self_healing_action = commander_decision["recommended_healing_action"]
+        st.session_state.workflow_visible = True
         st.session_state.self_healing_result = {
             "action": commander_decision["recommended_healing_action"],
             "action_label": get_healing_action_label(commander_decision["recommended_healing_action"]),
@@ -975,8 +1011,8 @@ def main() -> None:
         action_summary["detail"] = "Monitoring only"
 
     summary_placeholder = st.empty()
-    if source_config["mode"] == "Embedded HLS player":
-        render_kpi_cards(telemetry)
+    render_kpi_cards(telemetry)
+    if st.session_state.workflow_visible or st.session_state.self_healing_status == "pending":
         with summary_placeholder.container():
             render_top_summary_cards(
                 telemetry=telemetry,
@@ -986,20 +1022,7 @@ def main() -> None:
                 action_summary=action_summary,
                 show_incident_card=False,
             )
-    else:
-        with summary_placeholder.container():
-            render_top_summary_cards(
-                telemetry=telemetry,
-                qoe_preview=qoe_preview,
-                workflow_state=default_agent_states,
-                band_config=band_config,
-                action_summary=action_summary,
-                show_incident_card=True,
-            )
-        render_kpi_cards(telemetry)
-    run_clicked = render_run_control(
-        primary=st.session_state.self_healing_status not in {"pending"}
-    )
+    run_clicked = False if st.session_state.self_healing_status == "pending" else render_run_control()
     auto_triggered = False
 
     if (
@@ -1022,11 +1045,13 @@ def main() -> None:
             st.session_state.last_player_auto_run_key = incident_key
             st.session_state.last_player_auto_run_ts = now
             auto_triggered = True
+            st.session_state.workflow_visible = True
             st.info(
                 f"{commander_decision['decision'].replace('_', ' ').title()} triggered automatically."
             )
 
     if run_clicked or auto_triggered:
+        st.session_state.workflow_visible = True
         run_multi_agent_workflow(
             telemetry=telemetry,
             selected_model=selected_model,
@@ -1065,7 +1090,11 @@ def main() -> None:
                 commander_decision=commander_decision,
                 self_healing_result=st.session_state.self_healing_result,
             )
-        elif source_config["mode"] != "Embedded HLS player":
+        elif (
+            source_config["mode"] != "Embedded HLS player"
+            and st.session_state.self_healing_status
+            not in {"pending", "approved", "completed", "rejected"}
+        ):
             render_empty_state()
 
 

@@ -4,6 +4,7 @@ import unittest
 
 from agents.incident_commander_agent import fallback_incident_commander_decision
 from services.self_healing_service import apply_post_healing_telemetry, sanitize_healing_action
+from workflow.autonomous_orchestrator import is_self_healing_eligible
 
 
 class AutonomousFlowTests(unittest.TestCase):
@@ -47,6 +48,39 @@ class AutonomousFlowTests(unittest.TestCase):
 
     def test_unsupported_healing_action_is_blocked(self) -> None:
         self.assertEqual(sanitize_healing_action("router_factory_reset"), "none")
+
+    def test_manual_self_healing_requires_poor_qoe_and_two_severe_signals(self) -> None:
+        eligible = is_self_healing_eligible(
+            source_config={"mode": "Manual"},
+            telemetry={
+                "buffering_ratio": 7.0,
+                "latency_ms": 190,
+                "packet_loss": 0.8,
+                "app_crashes": 0,
+            },
+            qoe_preview={"qoe_status": "Poor"},
+            playback_impact=None,
+            commander_decision={
+                "decision": "self_heal",
+                "recommended_healing_action": "restart_streaming_app",
+                "human_approval_required": True,
+            },
+        )
+        self.assertTrue(eligible)
+
+    def test_live_embedded_self_healing_requires_confirmed_impact(self) -> None:
+        eligible = is_self_healing_eligible(
+            source_config={"mode": "Embedded HLS player", "player_scenario": "Live"},
+            telemetry={},
+            qoe_preview={"qoe_status": "Warning"},
+            playback_impact={"impact_status": "Stable"},
+            commander_decision={
+                "decision": "self_heal",
+                "recommended_healing_action": "refresh_streaming_session",
+                "human_approval_required": True,
+            },
+        )
+        self.assertFalse(eligible)
 
 
 if __name__ == "__main__":

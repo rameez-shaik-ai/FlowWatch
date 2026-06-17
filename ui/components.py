@@ -222,6 +222,55 @@ def render_empty_state() -> None:
     )
 
 
+def render_decision_dashboard(
+    telemetry: dict[str, Any],
+    qoe_preview: dict[str, Any],
+    playback_impact: dict[str, Any] | None,
+    commander_decision: dict[str, Any],
+    source_config: dict[str, Any],
+) -> None:
+    qoe_status = str(qoe_preview.get("qoe_status", "Unknown"))
+    qoe_tone = {
+        "Good": "success",
+        "Warning": "warning",
+        "Poor": "critical",
+    }.get(qoe_status, "neutral")
+    decision = str(commander_decision.get("decision", "monitor_only")).replace("_", " ").title()
+    action = str(commander_decision.get("recommended_healing_action", "none")).replace("_", " ").title()
+    approval_required = "Yes" if commander_decision.get("human_approval_required") else "No"
+    mode = source_config.get("mode")
+    impact_label = "Manual Impact"
+    impact_value = "Based on QoE and severe telemetry symptoms"
+    impact_score = None
+    if mode == "Embedded HLS player" and playback_impact is not None:
+        impact_label = "Playback Impact"
+        impact_value = str(playback_impact.get("impact_status", "Unknown"))
+        impact_score = playback_impact.get("impact_score")
+
+    cards: list[tuple[str, str, str]] = [
+        ("QoE Score", str(int(telemetry.get("qoe_score", 0))), "neutral"),
+        ("QoE Status", qoe_status, qoe_tone),
+        (impact_label, impact_value, "neutral"),
+        ("Commander Decision", decision, "info"),
+        ("Recommended Action", action, "warning" if action.lower() != "none" else "neutral"),
+        ("Approval Required", approval_required, "warning" if approval_required == "Yes" else "success"),
+    ]
+    if impact_score is not None:
+        cards.insert(3, ("Impact Score", str(int(impact_score)), "neutral"))
+
+    cols = st.columns(len(cards), gap="small")
+    for column, (label, value, tone) in zip(cols, cards):
+        column.markdown(
+            f"""
+            <div class="kpi-card dashboard-card {tone}">
+                <p class="kpi-label">{escape(label)}</p>
+                <div class="dashboard-value">{escape(value)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_commander_decision_card(commander_decision: dict[str, Any] | None) -> None:
     if not commander_decision:
         return
