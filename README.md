@@ -237,9 +237,20 @@ FlowWatch now checks player smoothness signals before triggering agents in embed
 - player state
 - playback progress
 - dropped-frame ratio
-- stall count
+- raw stall events
 - resolution
 - player errors
+
+Raw browser `waiting` and `stalled` events are treated as warning signals, not automatic impact. That avoids false positives during startup, short internal buffering, or seek transitions.
+
+FlowWatch now confirms playback impact using a combination of:
+
+- low or critical buffered-ahead depth
+- whether playback time is actually moving
+- dropped-frame ratio thresholds
+- sustained buffering/waiting state
+- low resolution during degraded QoE
+- explicit player error states
 
 If QoE is risky but playback is still smooth, FlowWatch continues monitoring. Agents trigger only when playback impact is confirmed or critical.
 

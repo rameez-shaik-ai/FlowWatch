@@ -330,7 +330,7 @@ def render_embedded_player_panel(
                     <div><span>Buffered ahead</span><strong>{float(telemetry.get('buffered_ahead_seconds', 0.0)):.1f}s</strong></div>
                     <div><span>Player state</span><strong>{escape(str(telemetry.get('player_state', '-')))}</strong></div>
                     <div><span>Dropped-frame ratio</span><strong>{dropped_frame_ratio:.1f}%</strong></div>
-                    <div><span>Stall count</span><strong>{int(telemetry.get('stall_count', 0))}</strong></div>
+                    <div><span>Stall events</span><strong>{int(telemetry.get('stall_count', 0))}</strong></div>
                     <div><span>Resolution</span><strong>{escape(str(telemetry.get('resolution', '-')))}</strong></div>
                     <div><span>Playback moving</span><strong>{'Yes' if telemetry.get('playback_time_moving') else 'No'}</strong></div>
                 </div>
