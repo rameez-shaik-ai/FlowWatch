@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import os
 
-import streamlit as st
-from dotenv import load_dotenv
-from streamlit.errors import StreamlitSecretNotFoundError
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional in stripped-down test runtimes
+    def load_dotenv() -> bool:
+        return False
+try:
+    import streamlit as st
+    from streamlit.errors import StreamlitSecretNotFoundError
+except ImportError:  # pragma: no cover - allows tests to import config without Streamlit
+    st = None
 
 
 load_dotenv()
@@ -35,6 +42,8 @@ DEFAULT_TELEMETRY = {
 
 def get_secret(name: str, default: str = "") -> str:
     """Read a secret from Streamlit first, then fall back to environment variables."""
+    if st is None:
+        return os.getenv(name, default)
     try:
         return st.secrets.get(name, os.getenv(name, default))
     except StreamlitSecretNotFoundError:

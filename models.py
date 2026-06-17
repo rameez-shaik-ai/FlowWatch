@@ -17,3 +17,4 @@ class BandConfig:
     api_key: str
     rest_url: str
     participants: list[BandParticipant]
+    force_publish_monitoring: bool = False

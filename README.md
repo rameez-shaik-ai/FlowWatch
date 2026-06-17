@@ -264,6 +264,39 @@ Live mode uses a custom Streamlit component backed by `hls.js`.
 - True packet loss and network latency are still estimated in the demo from player behavior.
 - In production, those values would come from CDN, device, and network telemetry.
 
+## Autonomous Incident Commander
+
+FlowWatch now includes an Incident Commander Agent that decides whether the app should:
+
+- continue monitoring
+- run diagnosis
+- run recovery/self-healing
+- involve customer care
+- escalate into a Band-backed incident room
+
+The commander receives telemetry, the QoE monitoring result, and the Playback Impact Gate result. If the AI/ML API is unavailable, FlowWatch falls back to a deterministic routing policy based on playback impact severity.
+
+## Self-Healing Approval Flow
+
+Self-healing is intentionally approval-gated. The commander can recommend safe actions such as:
+
+- restart streaming app
+- refresh streaming session
+- retry playback
+
+Python enforces safety. Unsupported or risky actions are converted to `none` and never executed automatically. For the hackathon demo, restart-app healing is simulated with a short progress animation, improved post-healing telemetry, and a fresh QoE/playback re-check.
+
+## Band Incident Collaboration
+
+Band is now used as more than a publishing layer. When the commander requires collaboration, FlowWatch can use Band as:
+
+- incident room
+- approval/audit trail
+- agent handoff trace
+- outcome log
+
+Band events include the Playback Impact Gate result, the Incident Commander decision, specialist agent handoffs, self-healing approval status, and the final incident outcome. Monitoring-only incidents can still be forced into Band with the sidebar demo toggle.
+
 ## How The Workflow Works
 
 1. The QoE Monitoring Agent evaluates the current session using deterministic rules.

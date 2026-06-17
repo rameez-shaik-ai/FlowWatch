@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import json
 
-import requests
+try:
+    import requests
+except ImportError:  # pragma: no cover - lightweight runtimes may not have requests installed
+    requests = None
 
 from config import AIML_API_URL, get_secret
 
 
 def call_aiml_api(system_prompt: str, user_prompt: str, model_name: str) -> str:
     """Call the AI/ML API and return the assistant text or a helpful error string."""
+    if requests is None:
+        return "Error: requests package is unavailable in this runtime."
     api_key = get_secret("AIML_API_KEY")
     if not api_key:
         return (

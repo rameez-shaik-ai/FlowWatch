@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover - fallback for environments missing the 
 
 from agents.customer_care_agent import customer_care_agent
 from agents.diagnosis_agent import diagnosis_agent
+from agents.incident_commander_agent import incident_commander_agent
 from agents.qoe_monitoring_agent import qoe_monitoring_agent
 from agents.recovery_action_agent import recovery_action_agent
 from config import DEFAULT_MODEL, DEFAULT_TELEMETRY, MODEL_OPTIONS, get_secret
@@ -21,6 +22,13 @@ from services.band_service import (
     run_band_publish,
 )
 from services.playback_impact_gate import evaluate_playback_impact
+from services.self_healing_service import (
+    apply_post_healing_telemetry,
+    get_healing_action_description,
+    get_healing_action_label,
+    sanitize_healing_action,
+    simulate_restart_app_progress,
+)
 from services.player_service import (
     DEFAULT_HLS_STREAM_URL,
     generate_dynamic_player_telemetry,
@@ -30,11 +38,13 @@ from services.player_service import (
 from services.telemetry_service import load_live_telemetry
 from ui.components import (
     render_compact_header,
+    render_commander_decision_card,
     render_embedded_player_panel,
     render_empty_state,
     render_kpi_cards,
     render_results_tabs,
     render_run_control,
+    render_self_healing_approval_card,
     render_top_summary_cards,
 )
 from ui.styles import apply_theme
@@ -42,6 +52,10 @@ from utils.qoe_scoring import (
     calculate_qoe_score,
     generate_ideal_telemetry,
     generate_random_telemetry,
+)
+from workflow.autonomous_orchestrator import (
+    get_action_summary_from_commander,
+    should_run_agent,
 )
 
 
@@ -70,6 +84,18 @@ def initialize_session_state() -> None:
         st.session_state.player_last_refresh_epoch = time.time()
     if "live_player_metrics" not in st.session_state:
         st.session_state.live_player_metrics = None
+    if "commander_decision" not in st.session_state:
+        st.session_state.commander_decision = None
+    if "self_healing_status" not in st.session_state:
+        st.session_state.self_healing_status = None
+    if "self_healing_action" not in st.session_state:
+        st.session_state.self_healing_action = "none"
+    if "self_healing_result" not in st.session_state:
+        st.session_state.self_healing_result = None
+    if "post_healing_telemetry" not in st.session_state:
+        st.session_state.post_healing_telemetry = None
+    if "post_healing_playback_impact" not in st.session_state:
+        st.session_state.post_healing_playback_impact = None
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
     with st.sidebar:
@@ -364,24 +390,26 @@ def run_multi_agent_workflow(
     source_config: dict[str, Any],
     auto_triggered: bool = False,
     playback_impact: dict[str, Any] | None = None,
+    commander_decision: dict[str, Any] | None = None,
+    self_healing_result: dict[str, Any] | None = None,
 ) -> None:
     room_id = f"band-room-{telemetry['customer_id'].lower()}"
     communication_log: list[dict[str, Any]] = []
     band_result: dict[str, Any] | None = None
     agent_states = dict(default_agent_states)
     embedded_mode = source_config["mode"] == "Embedded HLS player"
-    allow_customer_care = (
-        playback_impact.get("should_run_customer_care", True)
-        if playback_impact is not None
-        else True
-    )
-
-    action_summary = {
-        "title": "Monitoring in progress",
-        "detail": "Checking the session against FlowWatch QoE thresholds.",
-        "priority": "Pending",
-        "band": "Enabled" if band_config.enabled else "Disabled",
+    commander_decision = commander_decision or {
+        "decision": "monitor_only",
+        "severity": "Low",
+        "band_room_required": False,
+        "agents_to_run": [],
+        "customer_care_required": False,
     }
+    allow_customer_care = should_run_agent(commander_decision, "Customer Care Agent")
+    run_diagnosis = should_run_agent(commander_decision, "Diagnosis Agent")
+    run_recovery = should_run_agent(commander_decision, "Recovery Action Agent")
+
+    action_summary = get_action_summary_from_commander(commander_decision)
     agent_states["QoE Monitoring Agent"] = "active"
     with summary_placeholder.container():
         render_top_summary_cards(
@@ -413,14 +441,22 @@ def run_multi_agent_workflow(
             ),
         )
     )
+    communication_log.append(
+        create_band_event(
+            step=len(communication_log) + 1,
+            sender="Incident Commander Agent",
+            receiver=", ".join(commander_decision.get("agents_to_run", [])) or "Monitoring Console",
+            event_type="decision",
+            summary=(
+                f"Selected {commander_decision.get('decision', 'monitor_only')} "
+                f"with severity {commander_decision.get('severity', 'Low')}."
+            ),
+            payload=commander_decision,
+        )
+    )
 
-    if qoe_result["qoe_status"] == "Good":
-        action_summary = {
-            "title": "Passive monitoring",
-            "detail": "QoE is healthy. No escalation or customer outreach is required.",
-            "priority": "Low",
-            "band": "Published" if band_config.enabled else "Disabled",
-        }
+    if not run_diagnosis and not run_recovery and not allow_customer_care:
+        action_summary = get_action_summary_from_commander(commander_decision)
         with summary_placeholder.container():
             render_top_summary_cards(
                 telemetry=telemetry,
@@ -436,7 +472,8 @@ def run_multi_agent_workflow(
             "service": telemetry["service"],
             "active_agents": ["QoE Monitoring Agent"],
             "latest_status": qoe_result["qoe_status"],
-            "next_action": "Continue passive monitoring",
+            "next_action": commander_decision.get("next_step", "Continue passive monitoring"),
+            "commander_decision": commander_decision,
         }
         if source_config["mode"] == "Embedded HLS player":
             shared_context.update(
@@ -455,9 +492,12 @@ def run_multi_agent_workflow(
             recovery_text=None,
             customer_care_text=None,
             model_name=selected_model,
+            playback_impact=playback_impact,
+            commander_decision=commander_decision,
+            self_healing_result=self_healing_result,
         )
         st.success(
-            "QoE looks healthy. FlowWatch stopped after monitoring because no further action is required."
+            "Commander kept this incident in monitoring mode. No further agent escalation is required right now."
         )
         render_results_tabs(
             room_id=room_id,
@@ -469,53 +509,22 @@ def run_multi_agent_workflow(
             recovery_text=None,
             customer_care_text=None,
             telemetry=telemetry,
+            commander_decision=commander_decision,
+            self_healing_result=self_healing_result,
         )
         return
 
-    agent_states["Diagnosis Agent"] = "active"
-    action_summary = {
-        "title": "Diagnosis running",
-        "detail": "Telemetry is being analyzed to identify the likely root cause.",
-        "priority": "Medium",
-        "band": "Enabled" if band_config.enabled else "Disabled",
-    }
-    with summary_placeholder.container():
-        render_top_summary_cards(
-            telemetry=telemetry,
-            qoe_preview=qoe_result,
-            workflow_state=agent_states,
-            band_config=band_config,
-            action_summary=action_summary,
-            show_incident_card=not embedded_mode,
-        )
-    time.sleep(0.15)
-
     with st.spinner("Running diagnosis, recovery, customer care, and Band sync..."):
-        diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
-        agent_states["Diagnosis Agent"] = "done"
-        communication_log.append(
-            create_band_event(
-                step=2,
-                sender="Diagnosis Agent",
-                receiver="Recovery Action Agent",
-                event_type="handoff",
-                summary="Published root cause assessment to the shared collaboration layer.",
-                payload={
-                    "diagnosis_summary": diagnosis_text,
-                    "customer_id": telemetry["customer_id"],
-                    "qoe_status": qoe_result["qoe_status"],
-                },
-            )
-        )
-
-        agent_states["Recovery Action Agent"] = "active"
-        action_summary = {
-            "title": "Recovery planning",
-            "detail": "FlowWatch is preparing safe remediation guidance for this incident.",
-            "priority": "High",
-            "band": "Enabled" if band_config.enabled else "Disabled",
-        }
-        with summary_placeholder.container():
+        diagnosis_text = None
+        if run_diagnosis:
+            agent_states["Diagnosis Agent"] = "active"
+            action_summary = {
+                "title": "Diagnosis running",
+                "detail": "Commander assigned Diagnosis Agent to identify the likely root cause.",
+                "priority": commander_decision.get("severity", "Medium"),
+                "band": "Required" if commander_decision.get("band_room_required") else "Optional",
+            }
+            with summary_placeholder.container():
                 render_top_summary_cards(
                     telemetry=telemetry,
                     qoe_preview=qoe_result,
@@ -524,24 +533,63 @@ def run_multi_agent_workflow(
                     action_summary=action_summary,
                     show_incident_card=not embedded_mode,
                 )
-        time.sleep(0.15)
-
-        recovery_text = recovery_action_agent(telemetry, diagnosis_text, selected_model)
-        agent_states["Recovery Action Agent"] = "done"
-        communication_log.append(
-            create_band_event(
-                step=3,
-                sender="Recovery Action Agent",
-                receiver="Customer Care Agent" if allow_customer_care else "Support Operations",
-                event_type="handoff",
-                summary="Shared recommended safe actions and monitoring plan.",
-                payload={
-                    "recovery_plan": recovery_text,
-                    "selected_model": selected_model,
-                    "customer_id": telemetry["customer_id"],
-                },
+            time.sleep(0.15)
+            diagnosis_text = diagnosis_agent(telemetry, qoe_result, selected_model)
+            agent_states["Diagnosis Agent"] = "done"
+            communication_log.append(
+                create_band_event(
+                    step=len(communication_log) + 1,
+                    sender="Diagnosis Agent",
+                    receiver="Recovery Action Agent" if run_recovery else "Support Operations",
+                    event_type="handoff",
+                    summary="Published root cause assessment to the shared collaboration layer.",
+                    payload={
+                        "diagnosis_summary": diagnosis_text,
+                        "customer_id": telemetry["customer_id"],
+                        "qoe_status": qoe_result["qoe_status"],
+                    },
+                )
             )
-        )
+
+        recovery_text = None
+        if run_recovery:
+            agent_states["Recovery Action Agent"] = "active"
+            action_summary = {
+                "title": "Recovery planning",
+                "detail": "Commander assigned Recovery Action Agent to prepare safe remediation guidance.",
+                "priority": commander_decision.get("severity", "High"),
+                "band": "Required" if commander_decision.get("band_room_required") else "Optional",
+            }
+            with summary_placeholder.container():
+                render_top_summary_cards(
+                    telemetry=telemetry,
+                    qoe_preview=qoe_result,
+                    workflow_state=agent_states,
+                    band_config=band_config,
+                    action_summary=action_summary,
+                    show_incident_card=not embedded_mode,
+                )
+            time.sleep(0.15)
+            recovery_text = recovery_action_agent(
+                telemetry,
+                diagnosis_text or qoe_result["customer_impact_summary"],
+                selected_model,
+            )
+            agent_states["Recovery Action Agent"] = "done"
+            communication_log.append(
+                create_band_event(
+                    step=len(communication_log) + 1,
+                    sender="Recovery Action Agent",
+                    receiver="Customer Care Agent" if allow_customer_care else "Support Operations",
+                    event_type="handoff",
+                    summary="Shared recommended safe actions and monitoring plan.",
+                    payload={
+                        "recovery_plan": recovery_text,
+                        "selected_model": selected_model,
+                        "customer_id": telemetry["customer_id"],
+                    },
+                )
+            )
 
         customer_care_text = None
         if allow_customer_care:
@@ -572,7 +620,7 @@ def run_multi_agent_workflow(
             agent_states["Customer Care Agent"] = "done"
             communication_log.append(
                 create_band_event(
-                    step=4,
+                    step=len(communication_log) + 1,
                     sender="Customer Care Agent",
                     receiver="Support Operations",
                     event_type="room_publish",
@@ -593,14 +641,17 @@ def run_multi_agent_workflow(
             recovery_text,
             customer_care_text,
             selected_model,
+            playback_impact=playback_impact,
+            commander_decision=commander_decision,
+            self_healing_result=self_healing_result,
         )
 
     action_summary = {
-        "title": "Proactive outreach" if allow_customer_care else "Recovery plan ready",
+        "title": "Proactive outreach" if allow_customer_care else get_action_summary_from_commander(commander_decision)["title"],
         "detail": (
             "The incident summary, next action, and customer communication are ready."
             if allow_customer_care
-            else "Diagnosis and recovery are complete. Continue technical monitoring before customer outreach."
+            else commander_decision.get("next_step", "Diagnosis and recovery are complete.")
         ),
         "priority": extract_priority_level(customer_care_text) if allow_customer_care else "High",
         "band": (
@@ -628,17 +679,13 @@ def run_multi_agent_workflow(
         "service": telemetry["service"],
         "active_agents": [
             "QoE Monitoring Agent",
-            "Diagnosis Agent",
-            "Recovery Action Agent",
-            "Customer Care Agent",
+            *([name for name in ["Diagnosis Agent", "Recovery Action Agent", "Customer Care Agent"] if should_run_agent(commander_decision, name)]),
         ],
         "latest_status": qoe_result["qoe_status"],
         "selected_model": selected_model,
-        "next_action": (
-            "Proactive outreach and continued monitoring"
-            if allow_customer_care
-            else "Continue technical recovery monitoring"
-        ),
+        "next_action": commander_decision.get("next_step", "Continue monitoring"),
+        "commander_decision": commander_decision,
+        "self_healing": self_healing_result,
     }
     if source_config["mode"] == "Embedded HLS player":
         shared_context.update(
@@ -659,9 +706,11 @@ def run_multi_agent_workflow(
         recovery_text=recovery_text,
         customer_care_text=customer_care_text,
         telemetry=telemetry,
+        commander_decision=commander_decision,
+        self_healing_result=self_healing_result,
     )
     st.success(
-        "FlowWatch analysis complete. The multi-agent workflow and Band communication layer are ready for demo."
+        "FlowWatch analysis complete. The commander-led workflow and Band collaboration trace are ready for demo."
     )
 
 
@@ -688,6 +737,7 @@ def main() -> None:
 
     band_config = build_band_config()
     selected_model, telemetry, source_config = render_sidebar_telemetry_inputs()
+    telemetry["source_mode"] = source_config["mode"]
     live_metrics_status = None
     if (
         source_config["mode"] == "Embedded HLS player"
@@ -705,16 +755,51 @@ def main() -> None:
             st.session_state.live_player_metrics,
             st.session_state.telemetry_values,
         )
+        telemetry["source_mode"] = source_config["mode"]
         st.session_state.telemetry_values = telemetry.copy()
     qoe_preview = qoe_monitoring_agent(telemetry)
     playback_impact = None
     if source_config["mode"] == "Embedded HLS player":
         playback_impact = evaluate_playback_impact(telemetry, qoe_preview["qoe_status"])
+    commander_decision = incident_commander_agent(
+        telemetry,
+        qoe_preview,
+        playback_impact,
+        selected_model,
+    )
+    requested_healing_action = commander_decision.get("recommended_healing_action", "none")
+    commander_decision["recommended_healing_action"] = sanitize_healing_action(
+        requested_healing_action
+    )
+    st.session_state.commander_decision = commander_decision
+    if (
+        commander_decision.get("recommended_healing_action") != "none"
+        and st.session_state.self_healing_status not in {"completed", "rejected"}
+    ):
+        st.session_state.self_healing_result = {
+            "action": commander_decision["recommended_healing_action"],
+            "action_label": get_healing_action_label(
+                commander_decision["recommended_healing_action"]
+            ),
+            "description": get_healing_action_description(
+                commander_decision["recommended_healing_action"]
+            ),
+            "approval_required": commander_decision.get("human_approval_required", False),
+            "status": "pending",
+            "execution_status": "Awaiting approval",
+            "post_healing_qoe_status": None,
+            "post_healing_playback_impact": None,
+        }
 
     render_compact_header(
         band_config=band_config,
         aiml_ready=bool(get_secret("AIML_API_KEY")),
     )
+    if requested_healing_action != commander_decision["recommended_healing_action"]:
+        st.warning(
+            f"Commander requested unsupported healing action `{requested_healing_action}`. "
+            "FlowWatch blocked it and kept the action set to `none`."
+        )
 
     if source_config["mode"] == "Embedded HLS player":
         live_metrics = render_embedded_player_panel(
@@ -742,37 +827,67 @@ def main() -> None:
                 "Auto-refresh dependency is unavailable in this environment. Use the manual refresh button to advance the embedded player telemetry."
             )
 
+    render_commander_decision_card(commander_decision)
+
+    approval_response = None
+    if st.session_state.self_healing_status not in {"completed", "rejected"}:
+        approval_response = render_self_healing_approval_card(commander_decision)
+    if approval_response == "approved":
+        progress = st.progress(0)
+        status_box = st.empty()
+        steps = simulate_restart_app_progress()
+        for index, step in enumerate(steps, start=1):
+            status_box.info(step)
+            time.sleep(0.75)
+            progress.progress(int(index / len(steps) * 100))
+        healed_telemetry = apply_post_healing_telemetry(telemetry)
+        healed_qoe = qoe_monitoring_agent(healed_telemetry)
+        healed_playback = (
+            evaluate_playback_impact(healed_telemetry, healed_qoe["qoe_status"])
+            if source_config["mode"] == "Embedded HLS player"
+            else None
+        )
+        st.session_state.telemetry_values = healed_telemetry.copy()
+        st.session_state.self_healing_status = "completed"
+        st.session_state.self_healing_action = "restart_streaming_app"
+        st.session_state.post_healing_telemetry = healed_telemetry
+        st.session_state.post_healing_playback_impact = healed_playback
+        st.session_state.self_healing_result = {
+            "action": "restart_streaming_app",
+            "action_label": get_healing_action_label("restart_streaming_app"),
+            "description": get_healing_action_description("restart_streaming_app"),
+            "approval_required": True,
+            "status": "completed",
+            "execution_status": "Restart simulation completed",
+            "post_healing_qoe_status": healed_qoe["qoe_status"],
+            "post_healing_qoe_score": healed_telemetry["qoe_score"],
+            "post_healing_playback_impact": healed_playback,
+            "post_healing_telemetry": healed_telemetry,
+        }
+        st.success("Restart completed. FlowWatch is monitoring recovery.")
+        st.rerun()
+    elif approval_response == "rejected":
+        st.session_state.self_healing_status = "rejected"
+        st.session_state.self_healing_action = "restart_streaming_app"
+        st.session_state.self_healing_result = {
+            "action": "restart_streaming_app",
+            "action_label": get_healing_action_label("restart_streaming_app"),
+            "description": get_healing_action_description("restart_streaming_app"),
+            "approval_required": True,
+            "status": "rejected",
+            "execution_status": "Operator rejected restart simulation",
+            "post_healing_qoe_status": None,
+            "post_healing_playback_impact": None,
+        }
+        st.warning("Restart was rejected. FlowWatch will continue monitoring and escalate if needed.")
+
     default_agent_states = {
         "QoE Monitoring Agent": "waiting",
         "Diagnosis Agent": "waiting",
         "Recovery Action Agent": "waiting",
         "Customer Care Agent": "waiting",
     }
-    action_summary = {
-        "title": "Ready to analyze",
-        "detail": "FlowWatch will monitor QoE, diagnose root cause, recommend safe actions, and prepare customer communication.",
-        "priority": "Pending",
-        "band": "Enabled" if band_config.enabled else "Disabled",
-    }
-    if source_config["mode"] == "Embedded HLS player" and playback_impact is not None:
-        action_summary = {
-            "title": {
-                "Stable": "Playback stable",
-                "At Risk": "QoE risk",
-                "Impact Confirmed": "Impact confirmed",
-                "Critical": "Critical impact",
-            }.get(playback_impact["impact_status"], "Playback monitor"),
-            "detail": {
-                "Stable": "Monitoring only — no playback impact confirmed.",
-                "At Risk": "QoE risk detected — watching for playback impact.",
-                "Impact Confirmed": "Playback impact confirmed — diagnosis and recovery recommended.",
-                "Critical": "Critical impact — full workflow recommended.",
-            }.get(playback_impact["impact_status"], "Monitoring embedded playback telemetry."),
-            "priority": "High"
-            if playback_impact["impact_status"] in {"Impact Confirmed", "Critical"}
-            else "Pending",
-            "band": "Enabled" if band_config.enabled else "Disabled",
-        }
+    action_summary = get_action_summary_from_commander(commander_decision)
 
     summary_placeholder = st.empty()
     with summary_placeholder.container():
@@ -794,6 +909,7 @@ def main() -> None:
         and source_config["player_auto_run_enabled"]
         and playback_impact is not None
         and playback_impact["should_run_diagnosis"]
+        and commander_decision.get("decision") in {"diagnose", "self_heal", "customer_care", "escalate"}
     ):
         incident_key = (
             f"{telemetry['customer_id']}|{telemetry['device_id']}|{qoe_preview['qoe_status']}|"
@@ -809,7 +925,7 @@ def main() -> None:
             st.session_state.last_player_auto_run_ts = now
             auto_triggered = True
             st.info(
-                f"{playback_impact['decision']} FlowWatch analysis triggered."
+                f"{commander_decision['decision'].replace('_', ' ').title()} triggered automatically."
             )
 
     if run_clicked or auto_triggered:
@@ -823,6 +939,8 @@ def main() -> None:
             source_config=source_config,
             auto_triggered=auto_triggered,
             playback_impact=playback_impact,
+            commander_decision=commander_decision,
+            self_healing_result=st.session_state.self_healing_result,
         )
     else:
         if source_config["mode"] != "Embedded HLS player":

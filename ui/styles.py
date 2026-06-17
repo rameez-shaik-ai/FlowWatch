@@ -258,6 +258,10 @@ html, body, [class*="css"] {
     gap: 0.9rem;
 }
 
+.commander-card {
+    margin: 0.75rem 0 1rem 0;
+}
+
 .workflow-stepper {
     display: flex;
     align-items: center;

@@ -64,6 +64,11 @@ def build_band_config() -> BandConfig:
                 "Band REST URL",
                 value=get_secret("BAND_REST_URL", DEFAULT_BAND_REST_URL),
             )
+            force_publish_monitoring = st.checkbox(
+                "Force publish monitoring events to Band",
+                value=False,
+                help="Useful for demos where you want a Band room even when the commander chooses monitor-only.",
+            )
 
             with st.expander("Optional Band participant agents"):
                 role_fields = [
@@ -101,6 +106,7 @@ def build_band_config() -> BandConfig:
         api_key=band_api_key,
         rest_url=band_rest_url,
         participants=participants,
+        force_publish_monitoring=force_publish_monitoring,
     )
 
 
@@ -130,6 +136,9 @@ async def publish_workflow_to_band(
     recovery_text: str | None,
     customer_care_text: str | None,
     model_name: str,
+    playback_impact: dict[str, Any] | None = None,
+    commander_decision: dict[str, Any] | None = None,
+    self_healing_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Publish the FlowWatch workflow into a Band room when enabled."""
     if not band_config.enabled:
@@ -141,6 +150,15 @@ async def publish_workflow_to_band(
         }
     if not band_config.api_key:
         return {"published": False, "error": "Missing BAND_API_KEY"}
+    if (
+        commander_decision
+        and not commander_decision.get("band_room_required", False)
+        and not band_config.force_publish_monitoring
+    ):
+        return {
+            "published": False,
+            "reason": "Commander did not require a Band room for this incident.",
+        }
 
     client = AsyncRestClient(
         api_key=band_config.api_key,
@@ -165,64 +183,78 @@ async def publish_workflow_to_band(
         except Exception as exc:
             warnings.append(f"Could not add {participant.display_name}: {exc}")
 
-    await client.agent_api_events.create_agent_chat_event(
-        chat_id=room_id,
-        event=ChatEventRequest(
-            content="FlowWatch started a proactive QoE investigation.",
-            message_type="thought",
-            metadata=_safe_event_metadata(
-                {
-                "customer_id": telemetry["customer_id"],
-                "service": telemetry["service"],
-                "orchestrator_agent_id": band_config.agent_id or "not_provided",
-                "model_name": model_name,
-                }
+    async def publish_event(content: str, metadata: dict[str, Any]) -> None:
+        await client.agent_api_events.create_agent_chat_event(
+            chat_id=room_id,
+            event=ChatEventRequest(
+                content=content,
+                message_type="thought",
+                metadata=_safe_event_metadata(metadata),
             ),
-        ),
-        request_options=DEFAULT_REQUEST_OPTIONS,
+            request_options=DEFAULT_REQUEST_OPTIONS,
+        )
+
+    await publish_event(
+        "FlowWatch started a proactive QoE investigation.",
+        {
+            "customer_id": telemetry["customer_id"],
+            "service": telemetry["service"],
+            "orchestrator_agent_id": band_config.agent_id or "not_provided",
+            "model_name": model_name,
+        },
     )
 
-    await client.agent_api_events.create_agent_chat_event(
-        chat_id=room_id,
-        event=ChatEventRequest(
-            content=f"QoE monitoring classified the session as {qoe_result['qoe_status']}.",
-            message_type="thought",
-            metadata=_safe_event_metadata(qoe_result),
-        ),
-        request_options=DEFAULT_REQUEST_OPTIONS,
+    if playback_impact is not None:
+        await publish_event(
+            f"Playback Impact Gate evaluated the session as {playback_impact.get('impact_status', 'Unknown')}.",
+            playback_impact,
+        )
+
+    if commander_decision is not None:
+        await publish_event(
+            (
+                f"Incident Commander selected {commander_decision.get('decision', 'monitor_only')} "
+                f"with severity {commander_decision.get('severity', 'Low')}."
+            ),
+            commander_decision,
+        )
+
+    await publish_event(
+        f"QoE monitoring classified the session as {qoe_result['qoe_status']}.",
+        qoe_result,
     )
 
     if diagnosis_text:
-        await client.agent_api_events.create_agent_chat_event(
-            chat_id=room_id,
-            event=ChatEventRequest(
-                content="Diagnosis completed and published to the room.",
-                message_type="thought",
-                metadata=_safe_event_metadata({"diagnosis": diagnosis_text}),
-            ),
-            request_options=DEFAULT_REQUEST_OPTIONS,
+        await publish_event(
+            "Diagnosis completed and published to the room.",
+            {"diagnosis": diagnosis_text},
         )
 
     if recovery_text:
-        await client.agent_api_events.create_agent_chat_event(
-            chat_id=room_id,
-            event=ChatEventRequest(
-                content="Recovery plan completed and published to the room.",
-                message_type="thought",
-                metadata=_safe_event_metadata({"recovery_plan": recovery_text}),
-            ),
-            request_options=DEFAULT_REQUEST_OPTIONS,
+        await publish_event(
+            "Recovery plan completed and published to the room.",
+            {"recovery_plan": recovery_text},
+        )
+
+    if self_healing_result and self_healing_result.get("approval_required"):
+        await publish_event(
+            "Self-healing approval was requested for the current incident.",
+            self_healing_result,
+        )
+    if self_healing_result and self_healing_result.get("status") in {
+        "approved",
+        "rejected",
+        "completed",
+    }:
+        await publish_event(
+            f"Self-healing status: {self_healing_result.get('status')}.",
+            self_healing_result,
         )
 
     if customer_care_text:
-        await client.agent_api_events.create_agent_chat_event(
-            chat_id=room_id,
-            event=ChatEventRequest(
-                content="Customer care communication package completed.",
-                message_type="thought",
-                metadata=_safe_event_metadata({"customer_care": customer_care_text}),
-            ),
-            request_options=DEFAULT_REQUEST_OPTIONS,
+        await publish_event(
+            "Customer care communication package completed.",
+            {"customer_care": customer_care_text},
         )
 
     published_messages = 0
@@ -264,6 +296,9 @@ async def publish_workflow_to_band(
     ]
 
     for role, message in role_messages:
+        assigned_agents = set((commander_decision or {}).get("agents_to_run", []))
+        if assigned_agents and role not in assigned_agents:
+            continue
         participant = next(
             (item for item in band_config.participants if item.role == role),
             None,
@@ -288,6 +323,14 @@ async def publish_workflow_to_band(
         except Exception as exc:
             warnings.append(f"Could not message {participant.display_name}: {exc}")
 
+    outcome = {
+        "qoe_status": qoe_result.get("qoe_status"),
+        "playback_impact": (playback_impact or {}).get("impact_status"),
+        "commander_decision": (commander_decision or {}).get("decision"),
+        "self_healing_status": (self_healing_result or {}).get("status"),
+    }
+    await publish_event("Incident outcome recorded.", outcome)
+
     return {
         "published": True,
         "room_id": room_id,
@@ -306,6 +349,9 @@ def run_band_publish(
     recovery_text: str | None,
     customer_care_text: str | None,
     model_name: str,
+    playback_impact: dict[str, Any] | None = None,
+    commander_decision: dict[str, Any] | None = None,
+    self_healing_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         return asyncio.run(
@@ -317,6 +363,9 @@ def run_band_publish(
                 recovery_text,
                 customer_care_text,
                 model_name,
+                playback_impact,
+                commander_decision,
+                self_healing_result,
             )
         )
     except Exception as exc:

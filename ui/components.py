@@ -222,6 +222,69 @@ def render_empty_state() -> None:
     )
 
 
+def render_commander_decision_card(commander_decision: dict[str, Any] | None) -> None:
+    if not commander_decision:
+        return
+    decision = str(commander_decision.get("decision", "monitor_only")).replace("_", " ").title()
+    severity = str(commander_decision.get("severity", "Low"))
+    tone = {
+        "Low": "success",
+        "Medium": "warning",
+        "High": "warning",
+        "Critical": "critical",
+    }.get(severity, "neutral")
+    approval = "Required" if commander_decision.get("human_approval_required") else "Not required"
+    action = str(commander_decision.get("recommended_healing_action", "none")).replace("_", " ").title()
+    st.markdown(
+        f"""
+        <div class="summary-card commander-card">
+            <div class="impact-gate-head">
+                <p class="summary-eyebrow">Autonomous Decision</p>
+                {render_status_chip(severity, tone)}
+            </div>
+            <div class="impact-gate-copy">
+                <div><span>Commander decision</span><strong>{escape(decision)}</strong></div>
+                <div><span>Recommended action</span><strong>{escape(action)}</strong></div>
+                <div><span>Approval</span><strong>{escape(approval)}</strong></div>
+                <div><span>Next step</span><strong>{escape(str(commander_decision.get('next_step', 'Continue monitoring.')))}</strong></div>
+            </div>
+            <div class="result-copy">{escape(str(commander_decision.get("reason", "")))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_self_healing_approval_card(commander_decision: dict[str, Any]) -> str | None:
+    action = commander_decision.get("recommended_healing_action", "none")
+    if action != "restart_streaming_app" or not commander_decision.get("human_approval_required"):
+        return None
+
+    st.markdown(
+        f"""
+        <div class="summary-card commander-card">
+            <div class="impact-gate-head">
+                <p class="summary-eyebrow">Self-healing approval required</p>
+                {render_status_chip("Approval required", "warning")}
+            </div>
+            <div class="result-copy">
+                FlowWatch recommends restarting the streaming app to restore playback stability.<br><br>
+                <strong>Reason:</strong> {escape(str(commander_decision.get("reason", "Safe recovery was recommended.")))}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    approve_col, reject_col = st.columns(2, gap="small")
+    with approve_col:
+        if st.button("Approve Restart", type="primary", use_container_width=True):
+            return "approved"
+    with reject_col:
+        if st.button("Reject", use_container_width=True):
+            return "rejected"
+    return None
+
+
 def render_embedded_player_panel(
     *,
     stream_url: str,
@@ -356,36 +419,29 @@ def render_results_tabs(
     recovery_text: str | None,
     customer_care_text: str | None,
     telemetry: dict[str, Any],
+    commander_decision: dict[str, Any] | None = None,
+    self_healing_result: dict[str, Any] | None = None,
 ) -> None:
-    if diagnosis_text is None:
-        tabs = st.tabs(["Monitor", "Band Trace", "Raw Telemetry"])
-        with tabs[0]:
-            render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
-        with tabs[1]:
-            render_band_room(room_id, shared_context, communication_log, band_result)
-        with tabs[2]:
-            render_raw_telemetry_json(telemetry)
-        return
-
-    tab_names = ["Monitor", "Diagnose", "Recover"]
+    tab_specs: list[tuple[str, str, Any, bool]] = []
+    if commander_decision is not None:
+        tab_specs.append(("Commander", "Incident Commander Agent", commander_decision, True))
+    tab_specs.append(("Monitor", "QoE Monitoring Agent", qoe_result, True))
+    if diagnosis_text is not None:
+        tab_specs.append(("Diagnose", "Diagnosis Agent", diagnosis_text, False))
+    if recovery_text is not None:
+        tab_specs.append(("Recover", "Recovery Action Agent", recovery_text, False))
+    if self_healing_result is not None:
+        tab_specs.append(("Self-Healing", "Self-Healing Service", self_healing_result, True))
     if customer_care_text is not None:
-        tab_names.append("Communicate")
-    tab_names.extend(["Band Trace", "Raw Telemetry"])
+        tab_specs.append(("Communicate", "Customer Care Agent", customer_care_text, False))
+    tab_names = [item[0] for item in tab_specs] + ["Band Trace", "Raw Telemetry"]
     tabs = st.tabs(tab_names)
-    with tabs[0]:
-        render_agent_box("QoE Monitoring Agent", qoe_result, is_json=True)
-    with tabs[1]:
-        render_agent_box("Diagnosis Agent", diagnosis_text)
-    with tabs[2]:
-        render_agent_box("Recovery Action Agent", recovery_text or "")
-    next_index = 3
-    if customer_care_text is not None:
-        with tabs[3]:
-            render_agent_box("Customer Care Agent", customer_care_text or "")
-        next_index = 4
-    with tabs[next_index]:
+    for tab, (_, title, content, is_json) in zip(tabs, tab_specs):
+        with tab:
+            render_agent_box(title, content, is_json=is_json)
+    with tabs[len(tab_specs)]:
         render_band_room(room_id, shared_context, communication_log, band_result)
-    with tabs[next_index + 1]:
+    with tabs[len(tab_specs) + 1]:
         render_raw_telemetry_json(telemetry)
 
 
@@ -419,6 +475,8 @@ def render_band_room(
             live_note = f"Live Band room created successfully. Room ID: `{band_result['room_id']}`"
         elif band_result and band_result.get("error"):
             live_note = f"Band publish failed: {band_result['error']}"
+        elif band_result and band_result.get("reason"):
+            live_note = str(band_result["reason"])
 
         if band_result and band_result.get("published"):
             st.success(live_note)
