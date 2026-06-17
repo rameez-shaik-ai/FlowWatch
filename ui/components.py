@@ -197,12 +197,12 @@ def render_kpi_cards(telemetry: dict[str, Any]) -> None:
         )
 
 
-def render_run_control() -> bool:
+def render_run_control(*, primary: bool = True) -> bool:
     left, center, right = st.columns([1, 1.2, 1], gap="large")
     with center:
         return st.button(
             "Run FlowWatch Analysis",
-            type="primary",
+            type="primary" if primary else "secondary",
             use_container_width=True,
         )
 
@@ -256,9 +256,20 @@ def render_commander_decision_card(commander_decision: dict[str, Any] | None) ->
 
 
 def render_self_healing_approval_card(commander_decision: dict[str, Any]) -> str | None:
-    action = commander_decision.get("recommended_healing_action", "none")
-    if action != "restart_streaming_app" or not commander_decision.get("human_approval_required"):
+    if not commander_decision:
         return None
+    action = str(commander_decision.get("recommended_healing_action", "none"))
+    decision = str(commander_decision.get("decision", "monitor_only"))
+    if (
+        decision not in {"self_heal", "escalate"}
+        or action == "none"
+        or not commander_decision.get("human_approval_required")
+    ):
+        return None
+    approve_label = (
+        "Approve Refresh" if action == "refresh_streaming_session" else "Approve Restart"
+    )
+    action_label = "refreshing the streaming session" if action == "refresh_streaming_session" else "restarting the streaming app"
 
     st.markdown(
         f"""
@@ -268,7 +279,9 @@ def render_self_healing_approval_card(commander_decision: dict[str, Any]) -> str
                 {render_status_chip("Approval required", "warning")}
             </div>
             <div class="result-copy">
-                FlowWatch recommends restarting the streaming app to restore playback stability.<br><br>
+                FlowWatch recommends {escape(action_label)} to restore playback stability.<br><br>
+                <strong>Why this action?</strong><br>
+                Playback impact was confirmed and this is a safe session-level recovery action.<br><br>
                 <strong>Reason:</strong> {escape(str(commander_decision.get("reason", "Safe recovery was recommended.")))}
             </div>
         </div>
@@ -277,12 +290,52 @@ def render_self_healing_approval_card(commander_decision: dict[str, Any]) -> str
     )
     approve_col, reject_col = st.columns(2, gap="small")
     with approve_col:
-        if st.button("Approve Restart", type="primary", use_container_width=True):
+        if st.button(approve_label, type="primary", use_container_width=True):
             return "approved"
     with reject_col:
         if st.button("Reject", use_container_width=True):
             return "rejected"
     return None
+
+
+def render_self_healing_result_card(self_healing_result: dict[str, Any] | None) -> None:
+    if not self_healing_result:
+        return
+    status = str(self_healing_result.get("status", "pending")).title()
+    tone = {
+        "Completed": "success",
+        "Rejected": "warning",
+        "Approved": "info",
+        "Pending": "warning",
+    }.get(status, "neutral")
+    action = escape(str(self_healing_result.get("action_label") or self_healing_result.get("action", "none")).replace("_", " ").title())
+    approval_status = "Required" if self_healing_result.get("approval_required") else "Not required"
+    execution = escape(str(self_healing_result.get("execution_status", "Awaiting action")))
+    post_qoe = self_healing_result.get("post_healing_qoe_score")
+    post_qoe_status = self_healing_result.get("post_healing_qoe_status")
+    post_impact = self_healing_result.get("post_healing_playback_impact")
+    if isinstance(post_impact, dict):
+        post_impact = post_impact.get("impact_status")
+
+    st.markdown(
+        f"""
+        <div class="summary-card commander-card">
+            <div class="impact-gate-head">
+                <p class="summary-eyebrow">Self-healing result</p>
+                {render_status_chip(status, tone)}
+            </div>
+            <div class="impact-gate-copy">
+                <div><span>Action</span><strong>{action}</strong></div>
+                <div><span>Approval status</span><strong>{escape(approval_status)}</strong></div>
+                <div><span>Execution</span><strong>{execution}</strong></div>
+                <div><span>Post-healing QoE</span><strong>{escape(str(post_qoe)) if post_qoe is not None else "-"}</strong></div>
+                <div><span>Post-healing status</span><strong>{escape(str(post_qoe_status or '-'))}</strong></div>
+                <div><span>Playback impact</span><strong>{escape(str(post_impact or '-'))}</strong></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_embedded_player_panel(

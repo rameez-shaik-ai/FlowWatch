@@ -41,7 +41,7 @@ def get_healing_action_description(action: str) -> str:
     )
 
 
-def simulate_restart_app_progress() -> list[str]:
+def get_restart_steps() -> list[str]:
     return [
         "Closing playback session",
         "Clearing temporary session state",
@@ -50,21 +50,27 @@ def simulate_restart_app_progress() -> list[str]:
     ]
 
 
+def simulate_restart_app_progress() -> list[str]:
+    return get_restart_steps()
+
+
 def apply_post_healing_telemetry(telemetry: dict[str, Any]) -> dict[str, Any]:
-    healed = {
+    updated = {
         **telemetry,
-        "bitrate_mbps": max(float(telemetry.get("bitrate_mbps", 0.0) or 0.0), 5.8),
-        "buffering_ratio": min(float(telemetry.get("buffering_ratio", 0.0) or 0.0), 1.2),
-        "latency_ms": min(int(telemetry.get("latency_ms", 0) or 0), 80),
-        "packet_loss": min(float(telemetry.get("packet_loss", 0.0) or 0.0), 0.5),
+        "bitrate_mbps": max(float(telemetry.get("bitrate_mbps", 0) or 0), 5.8),
+        "buffering_ratio": min(float(telemetry.get("buffering_ratio", 99) or 99), 1.2),
+        "latency_ms": min(int(telemetry.get("latency_ms", 999) or 999), 80),
+        "packet_loss": min(float(telemetry.get("packet_loss", 99) or 99), 0.5),
         "app_crashes": 0,
         "player_state": "playing",
-        "buffered_ahead_seconds": max(
-            float(telemetry.get("buffered_ahead_seconds", 0.0) or 0.0), 12.0
-        ),
+        "buffered_ahead_seconds": max(float(telemetry.get("buffered_ahead_seconds", 0) or 0), 12.0),
         "resolution": "1920x1080",
+        "dropped_frames": int(telemetry.get("dropped_frames", 0) or 0),
+        "total_frames": max(int(telemetry.get("total_frames", 0) or 0), 1200),
+        "ready_state": 4,
+        "network_state": 1,
         "stall_count": 0,
         "playback_time_moving": True,
     }
-    healed["qoe_score"] = calculate_qoe_score(healed)
-    return healed
+    updated["qoe_score"] = calculate_qoe_score(updated)
+    return updated

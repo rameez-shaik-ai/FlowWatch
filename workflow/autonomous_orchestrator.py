@@ -20,23 +20,23 @@ def get_action_summary_from_commander(commander_decision: dict[str, Any]) -> dic
     mappings = {
         "monitor_only": {
             "title": "Monitor only",
-            "detail": "Commander decided no agent escalation is needed yet.",
+            "detail": "Monitoring only",
         },
         "diagnose": {
             "title": "Diagnosis required",
-            "detail": "Commander assigned Diagnosis Agent for investigation.",
+            "detail": "Diagnosis running",
         },
         "self_heal": {
             "title": "Self-healing recommended",
-            "detail": "Commander recommends safe recovery after approval.",
+            "detail": "Waiting for approval",
         },
         "customer_care": {
             "title": "Customer care required",
-            "detail": "Commander recommends customer-safe communication.",
+            "detail": "Customer care required",
         },
         "escalate": {
             "title": "Escalation required",
-            "detail": "Commander recommends full workflow and human oversight.",
+            "detail": "Waiting for approval",
         },
     }
     base = mappings.get(decision, mappings["monitor_only"])
