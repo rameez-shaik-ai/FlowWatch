@@ -912,7 +912,6 @@ def main() -> None:
             refresh_epoch=st.session_state.player_last_refresh_epoch,
             playback_impact=playback_impact,
             live_metrics_status=live_metrics_status,
-            telemetry_paused=st.session_state.player_refresh_paused or st.session_state.agent_workflow_running,
         )
         if source_config["player_scenario"] == "Live":
             if live_metrics is not None:

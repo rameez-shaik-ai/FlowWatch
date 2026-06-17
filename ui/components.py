@@ -398,8 +398,11 @@ def render_embedded_player_panel(
     refresh_epoch: float,
     playback_impact: dict[str, Any] | None = None,
     live_metrics_status: str | None = None,
-    telemetry_paused: bool = False,
 ) -> dict[str, Any] | None:
+    telemetry_paused = bool(
+        st.session_state.get("player_refresh_paused", False)
+        or st.session_state.get("agent_workflow_running", False)
+    )
     qoe_status = qoe_preview["qoe_status"]
     qoe_tone = {
         "Good": "success",
