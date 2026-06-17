@@ -159,6 +159,9 @@
       let stallCount = 0;
       let previousCurrentTime = 0;
       let latestArgs = { stream_url: "", refresh_interval_ms: 2000 };
+      let lastMountedStreamUrl = "";
+      let lastRefreshIntervalMs = 2000;
+      let emitMetrics = true;
       let lastSentHash = "";
       let sendHandle = null;
 
@@ -236,6 +239,9 @@
       }
 
       function pushMetrics(force = false) {
+        if (!emitMetrics) {
+          return;
+        }
         const metrics = buildMetrics();
         updatePreview(metrics);
         const comparable = {
@@ -276,6 +282,7 @@
 
       function mountStream(streamUrl) {
         clearPlayer();
+        lastMountedStreamUrl = streamUrl;
         if (!streamUrl) {
           setState("error");
           setNote("No HLS stream URL provided.");
@@ -311,7 +318,17 @@
         }
 
         sendHandle = window.setInterval(() => pushMetrics(false), latestArgs.refresh_interval_ms || 2000);
+        lastRefreshIntervalMs = latestArgs.refresh_interval_ms || 2000;
         pushMetrics(true);
+      }
+
+      function restartMetricLoop() {
+        if (sendHandle) {
+          clearInterval(sendHandle);
+          sendHandle = null;
+        }
+        sendHandle = window.setInterval(() => pushMetrics(false), latestArgs.refresh_interval_ms || 2000);
+        lastRefreshIntervalMs = latestArgs.refresh_interval_ms || 2000;
       }
 
       ["play", "playing"].forEach((eventName) =>
@@ -353,7 +370,14 @@
           stream_url: args.stream_url || "",
           refresh_interval_ms: Number(args.refresh_interval_ms || 2000),
         };
-        mountStream(latestArgs.stream_url);
+        emitMetrics = args.emit_metrics !== false;
+        if (latestArgs.stream_url !== lastMountedStreamUrl) {
+          mountStream(latestArgs.stream_url);
+        } else if ((latestArgs.refresh_interval_ms || 2000) !== lastRefreshIntervalMs) {
+          restartMetricLoop();
+        } else {
+          updatePreview(buildMetrics());
+        }
         Streamlit.setFrameHeight(document.documentElement.scrollHeight);
       }
 

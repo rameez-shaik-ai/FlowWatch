@@ -398,6 +398,7 @@ def render_embedded_player_panel(
     refresh_epoch: float,
     playback_impact: dict[str, Any] | None = None,
     live_metrics_status: str | None = None,
+    telemetry_paused: bool = False,
 ) -> dict[str, Any] | None:
     qoe_status = qoe_preview["qoe_status"]
     qoe_tone = {
@@ -433,6 +434,7 @@ def render_embedded_player_panel(
                         {render_status_chip(f"Scenario: {scenario}", "success")}
                         {render_status_chip(f"Refresh: {refresh_interval_label if auto_refresh_enabled else 'Manual'}", "info")}
                         {render_status_chip(f"Auto-analysis: {'On' if auto_run_enabled else 'Off'}", "neutral")}
+                        {render_status_chip("Telemetry paused" if telemetry_paused else "Telemetry live", "warning" if telemetry_paused else "success")}
                     </div>
                 </div>
             </div>
@@ -454,6 +456,7 @@ def render_embedded_player_panel(
                     else 5000,
                     height=620,
                     key=f"flowwatch-live-hls-{stream_url}",
+                    emit_metrics=not telemetry_paused,
                 )
             except Exception as exc:
                 components.html(build_hls_player_html(stream_url), height=590)
@@ -471,6 +474,9 @@ def render_embedded_player_panel(
                 if live_metrics_status == "received"
                 else "Waiting for live player metrics. Press play on the video."
             )
+            if telemetry_paused:
+                tone = "warning"
+                label = "Telemetry updates paused while FlowWatch completes the current workflow."
             st.markdown(render_status_chip(label, tone), unsafe_allow_html=True)
 
     refresh_label = "Just now"
