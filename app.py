@@ -102,9 +102,11 @@ def initialize_session_state() -> None:
         st.session_state.self_healing_log = []
     if "workflow_visible" not in st.session_state:
         st.session_state.workflow_visible = False
+    if "approval_popup_armed" not in st.session_state:
+        st.session_state.approval_popup_armed = False
 
 
-def reset_demo_state() -> None:
+def clear_workflow_state() -> None:
     st.session_state.self_healing_status = "none"
     st.session_state.self_healing_action = None
     st.session_state.self_healing_result = None
@@ -115,6 +117,15 @@ def reset_demo_state() -> None:
     st.session_state.last_player_auto_run_key = ""
     st.session_state.last_player_auto_run_ts = 0.0
     st.session_state.workflow_visible = False
+    st.session_state.approval_popup_armed = False
+
+
+def reset_demo_state() -> None:
+    st.session_state.telemetry_values = DEFAULT_TELEMETRY.copy()
+    st.session_state.live_player_metrics = None
+    st.session_state.player_tick = 0
+    st.session_state.player_last_refresh_epoch = time.time()
+    clear_workflow_state()
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
     with st.sidebar:
@@ -156,10 +167,14 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             random_col, ideal_col = st.columns(2, gap="small")
             with random_col:
                 if st.button("Random", use_container_width=True):
-                    st.session_state.telemetry_values = generate_random_telemetry()
+                    random_telemetry = generate_random_telemetry()
+                    clear_workflow_state()
+                    st.session_state.telemetry_values = random_telemetry
+                    st.session_state.approval_popup_armed = random_telemetry["qoe_score"] < 80
                     st.rerun()
             with ideal_col:
                 if st.button("Ideal", use_container_width=True):
+                    clear_workflow_state()
                     st.session_state.telemetry_values = generate_ideal_telemetry()
                     st.rerun()
 
@@ -804,6 +819,23 @@ def main() -> None:
     commander_decision["recommended_healing_action"] = sanitize_healing_action(
         requested_healing_action
     )
+    if (
+        source_config["mode"] == "Manual"
+        and st.session_state.approval_popup_armed
+        and qoe_preview.get("qoe_status") == "Poor"
+    ):
+        commander_decision = {
+            **commander_decision,
+            "decision": "self_heal",
+            "severity": "High",
+            "band_room_required": True,
+            "agents_to_run": ["Diagnosis Agent", "Recovery Action Agent"],
+            "customer_care_required": False,
+            "human_approval_required": True,
+            "recommended_healing_action": "refresh_streaming_session",
+            "reason": "Manual demo mode detected Poor QoE, so FlowWatch is requesting operator approval for a safe recovery action.",
+            "next_step": "Approve the streaming session refresh to continue the assisted recovery workflow.",
+        }
     st.session_state.commander_decision = commander_decision
     self_healing_eligible = is_self_healing_eligible(
         source_config=source_config,
@@ -812,7 +844,11 @@ def main() -> None:
         playback_impact=playback_impact,
         commander_decision=commander_decision,
     )
-    if self_healing_eligible and st.session_state.self_healing_status in {"none", "pending"}:
+    if (
+        self_healing_eligible
+        and st.session_state.approval_popup_armed
+        and st.session_state.self_healing_status in {"none", "pending"}
+    ):
         st.session_state.self_healing_status = "pending"
         st.session_state.self_healing_result = {
             "action": commander_decision["recommended_healing_action"],
@@ -839,10 +875,7 @@ def main() -> None:
             )
         ]
     elif not self_healing_eligible and st.session_state.self_healing_status == "pending":
-        st.session_state.self_healing_status = "none"
-        st.session_state.self_healing_action = None
-        st.session_state.self_healing_result = None
-        st.session_state.self_healing_log = []
+        clear_workflow_state()
 
     render_compact_header(
         band_config=band_config,
@@ -894,6 +927,7 @@ def main() -> None:
     if approval_response == "approved":
         action = commander_decision["recommended_healing_action"]
         action_label = get_healing_action_label(action)
+        st.session_state.approval_popup_armed = False
         st.session_state.self_healing_status = "approved"
         st.session_state.self_healing_action = action
         st.session_state.workflow_visible = True
@@ -966,6 +1000,7 @@ def main() -> None:
         st.success(f"{action_label} completed. FlowWatch is monitoring playback recovery.")
         st.rerun()
     elif approval_response == "rejected":
+        st.session_state.approval_popup_armed = False
         st.session_state.self_healing_status = "rejected"
         st.session_state.self_healing_action = commander_decision["recommended_healing_action"]
         st.session_state.workflow_visible = True
@@ -1024,6 +1059,10 @@ def main() -> None:
             )
     run_clicked = False if st.session_state.self_healing_status == "pending" else render_run_control()
     auto_triggered = False
+
+    if run_clicked and self_healing_eligible and st.session_state.self_healing_status == "none":
+        st.session_state.approval_popup_armed = True
+        st.rerun()
 
     if (
         source_config["mode"] == "Embedded HLS player"

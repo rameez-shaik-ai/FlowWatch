@@ -21,16 +21,7 @@ def is_self_healing_eligible(
 
     mode = source_config.get("mode")
     if mode == "Manual":
-        severe_signals = 0
-        if float(telemetry.get("buffering_ratio", 0) or 0) >= 5:
-            severe_signals += 1
-        if int(telemetry.get("latency_ms", 0) or 0) >= 150:
-            severe_signals += 1
-        if float(telemetry.get("packet_loss", 0) or 0) >= 2:
-            severe_signals += 1
-        if int(telemetry.get("app_crashes", 0) or 0) > 0:
-            severe_signals += 1
-        return qoe_preview.get("qoe_status") == "Poor" and severe_signals >= 2
+        return qoe_preview.get("qoe_status") == "Poor"
 
     if mode == "Embedded HLS player":
         impact_confirmed = (

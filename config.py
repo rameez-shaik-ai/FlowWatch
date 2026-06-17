@@ -31,12 +31,12 @@ DEFAULT_TELEMETRY = {
     "customer_id": "CUST_1001",
     "device_id": "STB_4455",
     "service": "TV streaming",
-    "bitrate_mbps": 2.1,
-    "buffering_ratio": 8.5,
-    "latency_ms": 180,
-    "packet_loss": 3.2,
-    "app_crashes": 1,
-    "qoe_score": 0,
+    "bitrate_mbps": 8.8,
+    "buffering_ratio": 0.4,
+    "latency_ms": 36,
+    "packet_loss": 0.2,
+    "app_crashes": 0,
+    "qoe_score": 100,
 }
 
 

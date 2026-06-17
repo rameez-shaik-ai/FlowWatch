@@ -99,6 +99,23 @@ def fallback_incident_commander_decision(
             "reason": "Playback is stable and no specialist escalation is required.",
             "next_step": "Continue monitoring the session.",
         }
+    if impact_status == "Critical" or qoe_status == "Poor":
+        return {
+            "agent": "Incident Commander Agent",
+            "decision": "escalate",
+            "severity": "Critical",
+            "band_room_required": True,
+            "agents_to_run": [
+                "Diagnosis Agent",
+                "Recovery Action Agent",
+                "Customer Care Agent",
+            ],
+            "customer_care_required": True,
+            "human_approval_required": True,
+            "recommended_healing_action": "restart_streaming_app",
+            "reason": "Critical playback disruption requires recovery, oversight, and communication.",
+            "next_step": "Run the full workflow with human oversight.",
+        }
     if impact_status == "At Risk":
         return {
             "agent": "Incident Commander Agent",
@@ -124,23 +141,6 @@ def fallback_incident_commander_decision(
             "recommended_healing_action": "restart_streaming_app",
             "reason": "Playback impact is confirmed and safe recovery should be prepared.",
             "next_step": "Run diagnosis and recovery, then request restart approval.",
-        }
-    if impact_status == "Critical" or qoe_status == "Poor":
-        return {
-            "agent": "Incident Commander Agent",
-            "decision": "escalate",
-            "severity": "Critical",
-            "band_room_required": True,
-            "agents_to_run": [
-                "Diagnosis Agent",
-                "Recovery Action Agent",
-                "Customer Care Agent",
-            ],
-            "customer_care_required": True,
-            "human_approval_required": True,
-            "recommended_healing_action": "restart_streaming_app",
-            "reason": "Critical playback disruption requires recovery, oversight, and communication.",
-            "next_step": "Run the full workflow with human oversight.",
         }
     return {
         "agent": "Incident Commander Agent",
