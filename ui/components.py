@@ -7,7 +7,6 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-from components.hls_telemetry_player import hls_telemetry_player
 from models import BandConfig
 from services.player_service import build_hls_player_html
 
@@ -443,16 +442,26 @@ def render_embedded_player_panel(
         if not stream_url.strip():
             st.warning("Add an HLS stream URL to render the embedded player.")
         elif scenario == "Live":
-            live_metrics = hls_telemetry_player(
-                stream_url=stream_url,
-                refresh_interval_ms=2000
-                if refresh_interval_label == "2 seconds"
-                else 3000
-                if refresh_interval_label == "3 seconds"
-                else 5000,
-                height=620,
-                key=f"flowwatch-live-hls-{stream_url}",
-            )
+            try:
+                from components.hls_telemetry_player import hls_telemetry_player
+
+                live_metrics = hls_telemetry_player(
+                    stream_url=stream_url,
+                    refresh_interval_ms=2000
+                    if refresh_interval_label == "2 seconds"
+                    else 3000
+                    if refresh_interval_label == "3 seconds"
+                    else 5000,
+                    height=620,
+                    key=f"flowwatch-live-hls-{stream_url}",
+                )
+            except Exception as exc:
+                components.html(build_hls_player_html(stream_url), height=590)
+                st.warning(
+                    "Live telemetry component could not be loaded in this runtime, so FlowWatch "
+                    "fell back to the embedded player preview. "
+                    f"Details: {exc}"
+                )
         else:
             components.html(build_hls_player_html(stream_url), height=590)
         if scenario == "Live":
