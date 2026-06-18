@@ -3,7 +3,11 @@ from __future__ import annotations
 import unittest
 
 from agents.incident_commander_agent import fallback_incident_commander_decision
-from services.self_healing_service import apply_post_healing_telemetry, sanitize_healing_action
+from services.self_healing_service import (
+    apply_post_healing_telemetry,
+    is_unsupported_healing_action,
+    sanitize_healing_action,
+)
 from workflow.autonomous_orchestrator import is_self_healing_eligible
 
 
@@ -48,6 +52,8 @@ class AutonomousFlowTests(unittest.TestCase):
 
     def test_unsupported_healing_action_is_blocked(self) -> None:
         self.assertEqual(sanitize_healing_action("router_factory_reset"), "none")
+        self.assertTrue(is_unsupported_healing_action("router_factory_reset"))
+        self.assertFalse(is_unsupported_healing_action("restart_streaming_app"))
 
     def test_manual_self_healing_requires_poor_qoe_and_two_severe_signals(self) -> None:
         eligible = is_self_healing_eligible(

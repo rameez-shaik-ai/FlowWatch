@@ -27,6 +27,7 @@ from services.self_healing_service import (
     get_restart_steps,
     get_healing_action_description,
     get_healing_action_label,
+    is_unsupported_healing_action,
     sanitize_healing_action,
 )
 from services.player_service import (
@@ -966,6 +967,9 @@ def main() -> None:
         selected_model,
     )
     requested_healing_action = commander_decision.get("recommended_healing_action", "none")
+    requested_healing_action_unsupported = is_unsupported_healing_action(
+        requested_healing_action
+    )
     commander_decision["recommended_healing_action"] = sanitize_healing_action(
         requested_healing_action
     )
@@ -1032,10 +1036,7 @@ def main() -> None:
         aiml_ready=bool(get_secret("AIML_API_KEY")),
     )
     requested_healing_action_display = str(requested_healing_action or "none").strip()
-    if (
-        requested_healing_action_display.lower() != "none"
-        and requested_healing_action_display != commander_decision["recommended_healing_action"]
-    ):
+    if requested_healing_action_unsupported:
         st.warning(
             f"Commander requested unsupported healing action `{requested_healing_action_display}`. "
             "FlowWatch blocked it and kept the action set to `none`."

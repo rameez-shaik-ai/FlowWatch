@@ -18,6 +18,11 @@ def sanitize_healing_action(action: str) -> str:
     return action if action in ALLOWED_SELF_HEALING_ACTIONS else "none"
 
 
+def is_unsupported_healing_action(action: str) -> bool:
+    normalized_action = str(action or "none").strip().lower()
+    return normalized_action != sanitize_healing_action(normalized_action)
+
+
 def get_healing_action_label(action: str) -> str:
     labels = {
         "restart_streaming_app": "Restart streaming app",
