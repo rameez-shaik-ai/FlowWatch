@@ -915,9 +915,13 @@ def main() -> None:
         band_config=band_config,
         aiml_ready=bool(get_secret("AIML_API_KEY")),
     )
-    if requested_healing_action != commander_decision["recommended_healing_action"]:
+    requested_healing_action_display = str(requested_healing_action or "none").strip()
+    if (
+        requested_healing_action_display.lower() != "none"
+        and requested_healing_action_display != commander_decision["recommended_healing_action"]
+    ):
         st.warning(
-            f"Commander requested unsupported healing action `{requested_healing_action}`. "
+            f"Commander requested unsupported healing action `{requested_healing_action_display}`. "
             "FlowWatch blocked it and kept the action set to `none`."
         )
 

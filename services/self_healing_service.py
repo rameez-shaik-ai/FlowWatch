@@ -14,7 +14,7 @@ ALLOWED_SELF_HEALING_ACTIONS = {
 
 
 def sanitize_healing_action(action: str) -> str:
-    action = str(action or "none")
+    action = str(action or "none").strip().lower()
     return action if action in ALLOWED_SELF_HEALING_ACTIONS else "none"
 
 
