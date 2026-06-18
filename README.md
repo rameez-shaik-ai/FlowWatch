@@ -1,121 +1,333 @@
 # FlowWatch
 
-FlowWatch is a hackathon-ready Streamlit prototype for proactive telecom TV streaming QoE monitoring. It combines deterministic QoE rules, AI-assisted specialist agents, and optional Band collaboration publishing in a single demo-friendly dashboard.
+FlowWatch is a hackathon-ready Streamlit application for proactive TV streaming QoE monitoring. It combines telecom telemetry, a multi-agent workflow, optional Band collaboration, an embedded HLS player demo, and a self-healing approval flow in one dashboard.
 
-## What The App Preserves
+This project is designed to answer a simple demo question:
 
-- Streamlit dashboard
-- KPN/telecom-inspired UI theme
-- Manual telemetry input
-- Live API telemetry fetch
-- Built-in demo Live API feed
-- Embedded HLS player telemetry mode
-- Random telemetry generation
-- Ideal telemetry generation
-- QoE Monitoring Agent
-- Diagnosis Agent
-- Recovery Action Agent
-- Customer Care Agent
-- AI/ML API integration
-- Band live publishing layer
-- Band participant configuration
-- Band handoff trace
-- Hackathon alignment section
+`Can we detect streaming quality problems early, understand the likely cause, recommend safe recovery actions, and coordinate the response with agents before the customer complains?`
 
-## Modular Architecture
+## What FlowWatch Does
+
+FlowWatch monitors a TV streaming session and turns raw telemetry into an operator-friendly incident workflow.
+
+It can:
+
+- calculate a QoE score from streaming telemetry
+- classify the session as `Good`, `Warning`, or `Poor`
+- trigger specialist agents only when needed
+- show likely root cause and recovery guidance
+- prepare customer-care communication
+- simulate safe self-healing with operator approval
+- publish incident collaboration events to Band
+
+## Who This Is For
+
+FlowWatch is useful for:
+
+- hackathon demos
+- telecom operations and NOC walkthroughs
+- product stakeholders reviewing AI-assisted support workflows
+- teams exploring proactive QoE monitoring concepts
+
+## Main Features
+
+- Streamlit dashboard with a telecom-inspired UI
+- Manual telemetry mode for controlled demos
+- Live API fetch mode with a built-in demo feed
+- Embedded HLS player mode with browser playback telemetry
+- QoE Monitoring, Diagnosis, Recovery, Customer Care, and Incident Commander agents
+- Playback Impact Gate to reduce false positives
+- Self-healing recommendation and approval flow
+- Optional Band room publishing and agent handoff trace
+- Random and ideal dataset generators for fast demos
+
+## How The Demo Works
+
+FlowWatch supports three telemetry source modes.
+
+### 1. Manual
+
+Use this when you want full control of the numbers.
+
+You can:
+
+- type values directly
+- generate a random session
+- generate an ideal session
+- instantly see the recalculated QoE score
+
+Best for:
+
+- judge demos
+- deterministic screenshots
+- explaining how QoE logic behaves
+
+### 2. Live API Fetch
+
+Use this when you want a “live feed” experience without running a separate backend.
+
+FlowWatch includes a built-in demo endpoint:
+
+```text
+flowwatch://demo/live-api/flowwatch-session
+```
+
+The built-in feed cycles through realistic states:
+
+- Healthy
+- Warning
+- Poor
+- Recovering
+
+Best for:
+
+- reliable Streamlit Cloud demos
+- showing changing telemetry over time
+- demonstrating that FlowWatch can ingest external-style telemetry
+
+### 3. Embedded HLS Player
+
+Use this when you want a visible video player plus live playback telemetry.
+
+Default stream:
+
+```text
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+```
+
+This mode shows:
+
+- live browser playback preview
+- buffered-ahead depth
+- playback progress
+- dropped frames
+- resolution
+- player state
+
+FlowWatch then maps those player metrics into telecom-style telemetry for scoring and agent decisions.
+
+Best for:
+
+- the most visual demo experience
+- showing how player behavior affects QoE
+- demonstrating playback-aware agent triggering
+
+## End-to-End Workflow
+
+FlowWatch follows this high-level flow:
+
+1. Telemetry is collected from manual input, demo API, or the embedded HLS player.
+2. QoE is calculated from bitrate, buffering, latency, packet loss, and app stability.
+3. The QoE Monitoring Agent classifies the session.
+4. The Playback Impact Gate checks whether degraded playback is actually customer-visible.
+5. The Incident Commander decides whether to keep monitoring, investigate further, or trigger recovery.
+6. The Diagnosis Agent identifies likely root cause.
+7. The Recovery Action Agent recommends safe next actions.
+8. The Customer Care Agent prepares customer-facing and support-ready communication.
+9. If enabled, FlowWatch publishes the incident workflow into Band.
+10. If self-healing is recommended, the operator can approve or reject the action.
+
+## Agent Overview
+
+### QoE Monitoring Agent
+
+- calculates QoE
+- checks thresholds
+- classifies health state
+- decides whether escalation is needed
+
+### Diagnosis Agent
+
+- analyzes degraded telemetry
+- identifies likely root cause
+- explains evidence and confidence
+
+### Recovery Action Agent
+
+- recommends safe recovery steps
+- suggests monitoring checks
+- keeps the demo bounded to low-risk actions
+
+### Customer Care Agent
+
+- prepares customer-friendly communication
+- creates internal support summary content
+- suggests next follow-up steps
+
+### Incident Commander Agent
+
+- decides whether to monitor, escalate, heal, or collaborate
+- routes the workflow
+- gates self-healing through approval logic
+
+## Playback Impact Gate
+
+Poor QoE should not automatically mean “the customer is definitely affected.”
+
+FlowWatch includes a Playback Impact Gate to reduce false positives, especially in embedded HLS player mode.
+
+It looks at signals such as:
+
+- buffered-ahead depth
+- whether playback time is moving
+- dropped-frame ratio
+- waiting or stalled states
+- low resolution under degraded conditions
+- explicit player errors
+
+This means FlowWatch can distinguish between:
+
+- telemetry that looks risky but playback is still stable
+- telemetry that has become a real viewer-impacting issue
+
+## Self-Healing Approval Flow
+
+FlowWatch can recommend limited, safe demo actions such as:
+
+- refresh streaming session
+- retry playback
+- restart streaming app
+
+These actions are:
+
+- recommendation-based
+- approval-gated
+- safety-checked in Python before execution
+
+Unsupported or unsafe actions are blocked instead of executed automatically.
+
+## Band Integration
+
+Band is used as the collaboration layer for the hackathon demo.
+
+When enabled, FlowWatch can publish:
+
+- incident room context
+- commander decision
+- specialist handoff trace
+- approval state
+- recovery outcome
+- final incident summary
+
+Band is optional. The app still works without it.
+
+## Project Structure
 
 ```text
 FlowWatch/
   app.py
   config.py
+  models.py
+  README.md
+  requirements.txt
+  assets/
+    flowwatch-architecture.png
+  agents/
+    customer_care_agent.py
+    diagnosis_agent.py
+    incident_commander_agent.py
+    qoe_monitoring_agent.py
+    recovery_action_agent.py
   components/
-    __init__.py
     hls_telemetry_player/
-      __init__.py
       frontend/
         index.html
-  models.py
   services/
-    __init__.py
     aiml_api.py
     band_service.py
     playback_impact_gate.py
     player_service.py
+    self_healing_service.py
     telemetry_service.py
-  agents/
-    __init__.py
-    qoe_monitoring_agent.py
-    diagnosis_agent.py
-    recovery_action_agent.py
-    customer_care_agent.py
   ui/
-    __init__.py
-    styles.py
-    layout.py
     components.py
+    layout.py
+    styles.py
   utils/
-    __init__.py
     qoe_scoring.py
-  assets/
-    flowwatch-architecture.png
-  requirements.txt
-  README.md
-  .env.example
-  .gitignore
+  workflow/
+    autonomous_orchestrator.py
 ```
 
 ## Module Guide
 
 - `app.py`
-  Coordinates Streamlit page setup, sidebar input flow, workflow execution, and result rendering.
+  Main Streamlit entry point. Coordinates sidebar state, telemetry source handling, workflow execution, and page rendering.
 - `config.py`
-  Holds constants and the secret-loading helper.
-- `components/hls_telemetry_player/`
-  Hosts the custom Streamlit component that streams live HLS browser metrics back into Python.
-- `models.py`
-  Holds shared dataclasses used by the Band layer.
-- `services/aiml_api.py`
-  Wraps AI/ML API calls and handles API error cases.
-- `services/band_service.py`
-  Handles Band SDK setup, configuration, publishing, and graceful fallback if the SDK is unavailable.
-- `services/player_service.py`
-  Builds the embedded HLS player HTML and generates dynamic mapped telemetry for the player prototype mode.
-- `services/playback_impact_gate.py`
-  Evaluates whether degraded QoE has become visible playback impact before agents are triggered.
-- `services/telemetry_service.py`
-  Loads and validates telemetry from live endpoints and powers the built-in demo live API feed.
-- `agents/`
-  Contains the four specialist agent implementations.
-- `ui/styles.py`
-  Applies the FlowWatch visual theme.
-- `ui/layout.py`
-  Renders page-level layout sections such as the hero and hackathon alignment.
-- `ui/components.py`
-  Renders reusable UI blocks such as orchestration cards, metrics, and Band trace views.
+  Shared defaults, model list, and secret-loading helpers.
 - `utils/qoe_scoring.py`
-  Provides QoE score calculation and demo telemetry generators.
+  QoE scoring rules plus random and ideal telemetry generators.
+- `services/telemetry_service.py`
+  Live API loading, validation, and built-in demo feed generation.
+- `services/player_service.py`
+  Embedded HLS player setup and mapping of player metrics into FlowWatch telemetry.
+- `services/playback_impact_gate.py`
+  Logic that decides whether degraded playback is truly customer-visible.
+- `services/self_healing_service.py`
+  Safe self-healing action handling and post-healing telemetry updates.
+- `services/band_service.py`
+  Band configuration, event formatting, and publishing helpers.
+- `services/aiml_api.py`
+  AI/ML API wrapper for diagnosis, recovery, and customer-care reasoning.
+- `agents/`
+  Specialist agent implementations.
+- `workflow/autonomous_orchestrator.py`
+  Incident Commander routing and workflow eligibility helpers.
+- `ui/styles.py`
+  Global visual theme.
+- `ui/layout.py`
+  Page-level layout helpers.
+- `ui/components.py`
+  Reusable UI cards, sections, panels, tabs, and workflow visuals.
 
-## How To Run Locally
+## QoE Logic
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+The QoE score is calculated from the telemetry fields in `utils/qoe_scoring.py`.
+
+The score is influenced by:
+
+- bitrate
+- buffering ratio
+- latency
+- packet loss
+- app crashes
+
+In the app:
+
+- changing manual telemetry updates the score
+- `Random` generates mixed-quality demo sessions
+- `Ideal` generates strong sessions, usually above 80 QoE
+
+## Running Locally
+
+### 1. Create a virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Copy `.env.example` to `.env` and add your keys.
-4. Start the app:
+### 3. Configure secrets
+
+Copy `.env.example` to `.env` and add the keys you want to use.
+
+### 4. Start the app
 
 ```bash
 streamlit run app.py
 ```
 
-The embedded player mode uses `hls.js` in the browser and `streamlit-autorefresh` for periodic KPI refresh in Streamlit.
+Then open the local Streamlit URL shown in your terminal.
 
 ## Environment Variables
 
-Add these values to `.env` for local runs:
+Typical local `.env` values:
 
 ```env
 AIML_API_KEY=your_ai_ml_api_key_here
@@ -124,7 +336,7 @@ BAND_API_KEY=your_band_remote_agent_api_key
 BAND_REST_URL=https://app.band.ai
 ```
 
-Optional Band participant agent values:
+Optional participant agent configuration:
 
 ```env
 BAND_DIAGNOSIS_AGENT_ID=
@@ -135,41 +347,44 @@ BAND_CUSTOMER_AGENT_ID=
 BAND_CUSTOMER_AGENT_NAME=Customer Care Agent
 ```
 
-## AI/ML API Setup
+## AI/ML API Usage
 
-FlowWatch uses:
+FlowWatch uses the AI/ML API for:
 
-- Endpoint: `https://api.aimlapi.com/v1/chat/completions`
-- Auth: Bearer token via `AIML_API_KEY`
+- diagnosis reasoning
+- recovery recommendations
+- customer-care output
+- incident commander guidance when available
 
-The AI/ML API powers:
+Endpoint:
 
-- Root cause diagnosis
-- Safe recovery recommendations
-- Customer-facing and internal support communication
+```text
+https://api.aimlapi.com/v1/chat/completions
+```
 
-## Band Setup
+Auth:
 
-FlowWatch can optionally publish each run into a live Band room.
+- Bearer token via `AIML_API_KEY`
 
-To enable it:
+If the model call is unavailable, parts of the workflow fall back to deterministic logic so the demo can still continue.
 
-1. Provide `BAND_API_KEY`
-2. Optionally provide `BAND_AGENT_ID`
-3. Optionally add participant agent IDs for diagnosis, recovery, and customer-care roles
+## Streamlit Cloud Deployment
 
-If `band-sdk` is not installed or not available at runtime, the app still works and shows a warning instead of crashing.
+### 1. Push the repo to GitHub
 
-Note:
-- `band-sdk` is included in `requirements.txt`
-- If your environment uses a different package name or a private index for the Band SDK, install that version and keep the same Python imports used in `services/band_service.py`
+Make sure `app.py` is in the repo root.
 
-## Streamlit Cloud Deployment Notes
+### 2. Create a Streamlit Cloud app
 
-1. Push the project to GitHub.
-2. Create a Streamlit Cloud app pointing at `app.py`.
-3. Add secrets in the Streamlit Cloud app settings if you do not want to rely on `.env`.
-4. Recommended secrets:
+Point the app to:
+
+- repository: your GitHub repo
+- branch: usually `main`
+- main file path: `app.py`
+
+### 3. Add secrets
+
+Add these in Streamlit Cloud secrets if needed:
 
 ```toml
 AIML_API_KEY = "your_ai_ml_api_key_here"
@@ -178,157 +393,90 @@ BAND_API_KEY = "your_band_remote_agent_api_key"
 BAND_REST_URL = "https://app.band.ai"
 ```
 
-Streamlit Cloud redeploys automatically when a new commit reaches the selected branch.
+### 4. Deploy
 
-## Built-in Demo Live API Feed
+Streamlit Cloud will rebuild and redeploy on every new push to the connected branch.
 
-FlowWatch includes a built-in dynamic telemetry feed for demo reliability. It appears as:
+## Demo Tips
 
-```text
-flowwatch://demo/live-api/flowwatch-session
-```
+### Best quick demo path
 
-The built-in feed simulates a realistic telemetry cycle:
+1. Start in `Manual`
+2. Click `Random`
+3. Show the QoE score and agent recommendation
+4. If the score is poor, run the full analysis
+5. Show approval flow and Band trace
 
-- Healthy
-- Warning
-- Poor
-- Recovering
+### Best visual demo path
 
-This lets `Live API fetch` mode work in Streamlit Cloud without requiring localhost or a separate public mock server. External API URL mode remains available for real integrations.
+1. Switch to `Embedded HLS player`
+2. Use `Degraded` scenario
+3. Enable refresh
+4. Show playback impact scoring
+5. Trigger the agent workflow
 
-Tip:
-- Do not use `localhost` for deployed Streamlit Cloud unless the API is also deployed publicly.
+### Best reliable “live” demo path
 
-## Embedded HLS Player Mode
+1. Switch to `Live API fetch`
+2. Use the built-in demo feed
+3. Let the feed cycle through healthy and degraded states
 
-FlowWatch now supports a third telemetry source: `Embedded HLS player`.
+## Troubleshooting
 
-Default stream:
+### The app loads but Band features fail
 
-```text
-https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
-```
+Check:
 
-This mode is implemented in 3 practical hackathon phases:
+- `BAND_API_KEY`
+- `BAND_AGENT_ID`
+- `BAND_REST_URL`
+- whether your Band SDK/package is installed correctly
 
-1. An embedded HLS video player is rendered in the dashboard.
-2. Browser-side JavaScript telemetry is shown inside the player component.
-3. Python-side FlowWatch telemetry is dynamically mapped and refreshed every few seconds.
+### Live API mode does not work with `localhost`
 
-### What is real vs simulated in the prototype
+That is expected on Streamlit Cloud. Use:
 
-- Real in the browser:
-  - HLS playback
-  - Player state
-  - Current playback time
-  - Buffered-ahead seconds
-  - Resolution
-  - Frame counters when supported by the browser
-- Simulated/mapped in Streamlit:
-  - `bitrate_mbps`
-  - `buffering_ratio`
-  - `latency_ms`
-  - `packet_loss`
-  - `qoe_score`
+- the built-in demo endpoint
+- or a publicly reachable API
 
-This keeps the prototype simple while still demonstrating how a production player SDK or custom bidirectional Streamlit component would feed real playback telemetry into the backend.
+### Embedded player mode looks blank
 
-### Embedded player controls
+Check:
 
-When `Embedded HLS player` is selected, FlowWatch exposes:
+- the stream URL is valid
+- your browser/network allows the stream
+- the Streamlit component assets loaded correctly
 
-- HLS stream URL
-- Auto-refresh player telemetry
-- Refresh interval: 2s / 3s / 5s
-- Scenario: Auto / Healthy / Degraded / Recovering / Live
-- Auto-run agent analysis when QoE becomes poor
+### The AI features are missing or weaker than expected
 
-### Auto-analysis behavior
+Check:
 
-If auto-analysis is enabled in embedded player mode, FlowWatch first checks the Playback Impact Gate. A cooldown is used to prevent repeated runs every refresh cycle.
+- `AIML_API_KEY`
+- model availability
+- network access from the runtime
 
-## Playback Impact Gate
+The app can still fall back to deterministic behavior for some flows.
 
-QoE score alone does not always mean the customer can see playback impact.
+## Production Adaptation Ideas
 
-FlowWatch now checks player smoothness signals before triggering agents in embedded HLS mode, including:
+This demo is intentionally lightweight. In a production version, you would likely replace or add:
 
-- buffer ahead
-- player state
-- playback progress
-- dropped-frame ratio
-- raw stall events
-- resolution
-- player errors
+- real telemetry ingestion from STBs, apps, CDNs, and probes
+- persistent incident storage
+- true ticketing integration
+- alerting integration
+- real player SDK telemetry
+- authenticated operator workflows
+- more policy controls around autonomous healing
 
-Raw browser `waiting` and `stalled` events are treated as warning signals, not automatic impact. That avoids false positives during startup, short internal buffering, or seek transitions.
+## Summary
 
-FlowWatch now confirms playback impact using a combination of:
+FlowWatch is a modern demo app that shows how telecom streaming telemetry, agent orchestration, self-healing approval, and collaboration tooling can work together in a single proactive QoE operations experience.
 
-- low or critical buffered-ahead depth
-- whether playback time is actually moving
-- dropped-frame ratio thresholds
-- sustained buffering/waiting state
-- low resolution during degraded QoE
-- explicit player error states
+If you want to understand the project quickly, start with:
 
-If QoE is risky but playback is still smooth, FlowWatch continues monitoring. Agents trigger only when playback impact is confirmed or critical.
-
-## Live HLS Player Telemetry
-
-Live mode uses a custom Streamlit component backed by `hls.js`.
-
-- The browser player collects playback metrics every 2 seconds.
-- Those metrics are passed into Python and used by the Playback Impact Gate.
-- QoE, KPI cards, and trigger decisions update from live player behavior.
-- True packet loss and network latency are still estimated in the demo from player behavior.
-- In production, those values would come from CDN, device, and network telemetry.
-
-## Autonomous Incident Commander
-
-FlowWatch now includes an Incident Commander Agent that decides whether the app should:
-
-- continue monitoring
-- run diagnosis
-- run recovery/self-healing
-- involve customer care
-- escalate into a Band-backed incident room
-
-The commander receives telemetry, the QoE monitoring result, and the Playback Impact Gate result. If the AI/ML API is unavailable, FlowWatch falls back to a deterministic routing policy based on playback impact severity.
-
-## Self-Healing Approval Flow
-
-Self-healing is intentionally approval-gated. The commander can recommend safe actions such as:
-
-- restart streaming app
-- refresh streaming session
-- retry playback
-
-Python enforces safety. Unsupported or risky actions are converted to `none` and never executed automatically. For the hackathon demo, restart-app healing is simulated with a short progress animation, improved post-healing telemetry, and a fresh QoE/playback re-check.
-
-## Band Incident Collaboration
-
-Band is now used as more than a publishing layer. When the commander requires collaboration, FlowWatch can use Band as:
-
-- incident room
-- approval/audit trail
-- agent handoff trace
-- outcome log
-
-Band events include the Playback Impact Gate result, the Incident Commander decision, specialist agent handoffs, self-healing approval status, and the final incident outcome. Monitoring-only incidents can still be forced into Band with the sidebar demo toggle.
-
-## How The Workflow Works
-
-1. The QoE Monitoring Agent evaluates the current session using deterministic rules.
-2. If the session is healthy, FlowWatch stops after monitoring.
-3. If the session is degraded, FlowWatch calls the Diagnosis Agent.
-4. The Recovery Action Agent proposes safe next steps.
-5. The Customer Care Agent prepares outreach and internal support outputs.
-6. If Band is enabled, FlowWatch publishes the workflow into a live Band room.
-
-## Developer Notes
-
-- Secrets are never hardcoded in source code.
-- The refactor keeps the app beginner-friendly and modular.
-- The current UI and behavior are preserved while reducing the amount of logic inside `app.py`.
+1. `app.py`
+2. `utils/qoe_scoring.py`
+3. `services/telemetry_service.py`
+4. `services/player_service.py`
+5. `workflow/autonomous_orchestrator.py`
