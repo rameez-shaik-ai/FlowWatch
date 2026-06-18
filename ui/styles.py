@@ -256,21 +256,50 @@ html, body, [class*="css"] {
     flex-direction: column;
     justify-content: space-between;
     gap: 0.9rem;
+    margin-top: 1rem;
 }
 
 .commander-card {
     margin: 0.75rem 0 1rem 0;
 }
 
+.result-compact-card {
+    min-height: auto;
+}
+
 .dashboard-card {
-    min-height: 128px;
+    min-height: 144px;
 }
 
 .dashboard-value {
-    font-size: 1.05rem;
-    line-height: 1.35;
+    font-size: 1.18rem;
+    line-height: 1.15;
     font-weight: 700;
     color: var(--text);
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.dashboard-qoe-score {
+    color: var(--text);
+    font-size: 2.25rem;
+    line-height: 1;
+    font-weight: 800;
+    margin-bottom: 0.45rem;
+}
+
+.dashboard-status {
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.15;
+    font-weight: 700;
+}
+
+.dashboard-meta {
+    margin-top: 0.55rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.35;
 }
 
 .workflow-stepper {

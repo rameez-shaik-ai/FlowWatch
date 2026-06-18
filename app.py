@@ -108,6 +108,10 @@ def initialize_session_state() -> None:
         st.session_state.player_refresh_paused = False
     if "agent_workflow_running" not in st.session_state:
         st.session_state.agent_workflow_running = False
+    if "previous_telemetry_source_mode" not in st.session_state:
+        st.session_state.previous_telemetry_source_mode = st.session_state.telemetry_source_mode
+    if "previous_player_scenario" not in st.session_state:
+        st.session_state.previous_player_scenario = st.session_state.player_scenario
 
 
 def clear_workflow_state() -> None:
@@ -153,6 +157,16 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             ),
             label_visibility="collapsed",
         )
+        if (
+            st.session_state.previous_telemetry_source_mode
+            != st.session_state.telemetry_source_mode
+        ):
+            st.session_state.previous_telemetry_source_mode = (
+                st.session_state.telemetry_source_mode
+            )
+            st.session_state.previous_player_scenario = st.session_state.player_scenario
+            reset_demo_state()
+            st.rerun()
         if st.button("Reset demo", use_container_width=True):
             reset_demo_state()
             st.rerun()
@@ -223,6 +237,13 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
                     st.session_state.player_scenario
                 ),
             )
+            if st.session_state.previous_player_scenario != st.session_state.player_scenario:
+                st.session_state.previous_player_scenario = st.session_state.player_scenario
+                st.session_state.live_player_metrics = None
+                st.session_state.player_tick = 0
+                st.session_state.player_last_refresh_epoch = time.time()
+                clear_workflow_state()
+                st.rerun()
             st.session_state.player_auto_run_enabled = st.toggle(
                 "Auto-run agent analysis when QoE is Poor",
                 value=st.session_state.player_auto_run_enabled,
@@ -934,9 +955,38 @@ def main() -> None:
         source_config=source_config,
     )
 
+    default_agent_states = {
+        "QoE Monitoring Agent": "waiting",
+        "Diagnosis Agent": "waiting",
+        "Recovery Action Agent": "waiting",
+        "Customer Care Agent": "waiting",
+    }
+    action_summary = get_action_summary_from_commander(commander_decision)
+    if st.session_state.self_healing_status == "pending":
+        action_summary["detail"] = "Waiting for approval"
+    elif st.session_state.self_healing_status == "completed":
+        action_summary["detail"] = "Self-healing completed"
+    elif st.session_state.self_healing_status == "approved":
+        action_summary["detail"] = "Diagnosis and recovery running"
+    elif st.session_state.self_healing_status == "rejected":
+        action_summary["detail"] = "Monitoring only"
+
+    render_kpi_cards(telemetry)
+    summary_placeholder = st.empty()
+    with summary_placeholder.container():
+        render_top_summary_cards(
+            telemetry=telemetry,
+            qoe_preview=qoe_preview,
+            workflow_state=default_agent_states,
+            band_config=band_config,
+            action_summary=action_summary,
+            show_incident_card=False,
+        )
+
     approval_response = None
     if self_healing_eligible and st.session_state.self_healing_status == "pending":
         approval_response = render_self_healing_approval_card(commander_decision)
+
     if approval_response == "approved":
         action = commander_decision["recommended_healing_action"]
         action_label = get_healing_action_label(action)
@@ -1041,35 +1091,6 @@ def main() -> None:
 
     if st.session_state.self_healing_status in {"approved", "completed", "rejected"}:
         render_self_healing_result_card(st.session_state.self_healing_result)
-
-    default_agent_states = {
-        "QoE Monitoring Agent": "waiting",
-        "Diagnosis Agent": "waiting",
-        "Recovery Action Agent": "waiting",
-        "Customer Care Agent": "waiting",
-    }
-    action_summary = get_action_summary_from_commander(commander_decision)
-    if st.session_state.self_healing_status == "pending":
-        action_summary["detail"] = "Waiting for approval"
-    elif st.session_state.self_healing_status == "completed":
-        action_summary["detail"] = "Self-healing completed"
-    elif st.session_state.self_healing_status == "approved":
-        action_summary["detail"] = "Diagnosis and recovery running"
-    elif st.session_state.self_healing_status == "rejected":
-        action_summary["detail"] = "Monitoring only"
-
-    summary_placeholder = st.empty()
-    render_kpi_cards(telemetry)
-    if st.session_state.workflow_visible or st.session_state.self_healing_status == "pending":
-        with summary_placeholder.container():
-            render_top_summary_cards(
-                telemetry=telemetry,
-                qoe_preview=qoe_preview,
-                workflow_state=default_agent_states,
-                band_config=band_config,
-                action_summary=action_summary,
-                show_incident_card=False,
-            )
     run_clicked = False if st.session_state.self_healing_status == "pending" else render_run_control()
     auto_triggered = False
 

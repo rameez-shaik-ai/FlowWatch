@@ -34,7 +34,7 @@ def render_compact_header(
     st.markdown(
         f"""
         <section class="compact-header">
-            <div class="header-badge">Telecom AI Command Center</div>
+            <div class="header-badge">AI Command Center</div>
             <div class="header-main">
                 <div>
                     <h1>FlowWatch</h1>
@@ -228,46 +228,63 @@ def render_decision_dashboard(
     commander_decision: dict[str, Any],
     source_config: dict[str, Any],
 ) -> None:
+    def format_decision_label(raw_decision: str) -> str:
+        mappings = {
+            "monitor_only": "Monitor Only",
+            "self_heal": "Self-Heal Agent",
+            "diagnose": "Diagnosis Agent",
+            "customer_care": "Customer Care Agent",
+            "escalate": "Escalation",
+        }
+        return mappings.get(raw_decision, raw_decision.replace("_", " ").title())
+
     qoe_status = str(qoe_preview.get("qoe_status", "Unknown"))
     qoe_tone = {
         "Good": "success",
         "Warning": "warning",
         "Poor": "critical",
     }.get(qoe_status, "neutral")
-    decision = str(commander_decision.get("decision", "monitor_only")).replace("_", " ").title()
-    action = str(commander_decision.get("recommended_healing_action", "none")).replace("_", " ").title()
-    approval_required = "Yes" if commander_decision.get("human_approval_required") else "No"
+    decision = format_decision_label(str(commander_decision.get("decision", "monitor_only")))
     mode = source_config.get("mode")
-    impact_label = "Manual Impact"
-    impact_value = "Based on QoE and severe telemetry symptoms"
-    impact_score = None
-    if mode == "Embedded HLS player" and playback_impact is not None:
-        impact_label = "Playback Impact"
-        impact_value = str(playback_impact.get("impact_status", "Unknown"))
-        impact_score = playback_impact.get("impact_score")
+    qoe_card = f"""
+        <div class="kpi-card dashboard-card {qoe_tone}">
+            <p class="kpi-label">QoE</p>
+            <div class="dashboard-qoe-score">{int(telemetry.get("qoe_score", 0))}</div>
+            <div class="dashboard-status">{escape(qoe_status)}</div>
+        </div>
+    """
+    commander_card = f"""
+        <div class="kpi-card dashboard-card info">
+            <p class="kpi-label">Commander Decision</p>
+            <div class="dashboard-value">{escape(decision)}</div>
+        </div>
+    """
 
-    cards: list[tuple[str, str, str]] = [
-        ("QoE Score", str(int(telemetry.get("qoe_score", 0))), "neutral"),
-        ("QoE Status", qoe_status, qoe_tone),
-        (impact_label, impact_value, "neutral"),
-        ("Commander Decision", decision, "info"),
-        ("Recommended Action", action, "warning" if action.lower() != "none" else "neutral"),
-        ("Approval Required", approval_required, "warning" if approval_required == "Yes" else "success"),
-    ]
-    if impact_score is not None:
-        cards.insert(3, ("Impact Score", str(int(impact_score)), "neutral"))
-
-    cols = st.columns(len(cards), gap="small")
-    for column, (label, value, tone) in zip(cols, cards):
-        column.markdown(
-            f"""
-            <div class="kpi-card dashboard-card {tone}">
-                <p class="kpi-label">{escape(label)}</p>
-                <div class="dashboard-value">{escape(value)}</div>
+    if mode == "Embedded HLS player":
+        impact = playback_impact or {}
+        impact_status = str(impact.get("impact_status", "Unknown"))
+        impact_tone = {
+            "Stable": "success",
+            "At Risk": "warning",
+            "Impact Confirmed": "critical",
+            "Critical": "critical",
+        }.get(impact_status, "neutral")
+        impact_score = int(impact.get("impact_score", 0) or 0)
+        impact_card = f"""
+            <div class="kpi-card dashboard-card {impact_tone}">
+                <p class="kpi-label">Playback Impact</p>
+                <div class="dashboard-value">{escape(impact_status)}</div>
+                <div class="dashboard-meta">Impact score: {impact_score}</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        """
+        cols = st.columns(3, gap="medium")
+        cards = [qoe_card, impact_card, commander_card]
+    else:
+        cols = st.columns(2, gap="medium")
+        cards = [qoe_card, commander_card]
+
+    for column, card in zip(cols, cards):
+        column.markdown(card, unsafe_allow_html=True)
 
 
 def render_commander_decision_card(commander_decision: dict[str, Any] | None) -> None:
@@ -365,20 +382,27 @@ def render_self_healing_result_card(self_healing_result: dict[str, Any] | None) 
     if isinstance(post_impact, dict):
         post_impact = post_impact.get("impact_status")
 
+    rows = [
+        f"<div><span>Action completed</span><strong>{action}</strong></div>",
+        f"<div><span>Approval status</span><strong>{escape(approval_status)}</strong></div>",
+        f"<div><span>Execution</span><strong>{execution}</strong></div>",
+        f"<div><span>Post-healing QoE</span><strong>{escape(str(post_qoe)) if post_qoe is not None else '-'}</strong></div>",
+        f"<div><span>Post-healing status</span><strong>{escape(str(post_qoe_status or '-'))}</strong></div>",
+    ]
+    if post_impact is not None:
+        rows.append(
+            f"<div><span>Post-healing impact</span><strong>{escape(str(post_impact))}</strong></div>"
+        )
+
     st.markdown(
         f"""
-        <div class="summary-card commander-card">
+        <div class="summary-card commander-card result-compact-card">
             <div class="impact-gate-head">
                 <p class="summary-eyebrow">Self-healing result</p>
                 {render_status_chip(status, tone)}
             </div>
             <div class="impact-gate-copy">
-                <div><span>Action</span><strong>{action}</strong></div>
-                <div><span>Approval status</span><strong>{escape(approval_status)}</strong></div>
-                <div><span>Execution</span><strong>{execution}</strong></div>
-                <div><span>Post-healing QoE</span><strong>{escape(str(post_qoe)) if post_qoe is not None else "-"}</strong></div>
-                <div><span>Post-healing status</span><strong>{escape(str(post_qoe_status or '-'))}</strong></div>
-                <div><span>Playback impact</span><strong>{escape(str(post_impact or '-'))}</strong></div>
+                {''.join(rows)}
             </div>
         </div>
         """,
