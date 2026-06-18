@@ -35,7 +35,11 @@ from services.player_service import (
     get_initial_player_telemetry,
     map_live_player_metrics_to_telemetry,
 )
-from services.telemetry_service import load_live_telemetry
+from services.telemetry_service import (
+    DEMO_LIVE_API_ENDPOINT_PREFIX,
+    generate_demo_live_api_telemetry,
+    load_live_telemetry,
+)
 from ui.components import (
     render_compact_header,
     render_decision_dashboard,
@@ -112,6 +116,20 @@ def initialize_session_state() -> None:
         st.session_state.previous_telemetry_source_mode = st.session_state.telemetry_source_mode
     if "previous_player_scenario" not in st.session_state:
         st.session_state.previous_player_scenario = st.session_state.player_scenario
+    if "live_api_mode" not in st.session_state:
+        st.session_state.live_api_mode = "Built-in demo feed"
+    if "live_api_session_id" not in st.session_state:
+        st.session_state.live_api_session_id = "flowwatch-session"
+    if "live_api_auto_refresh_enabled" not in st.session_state:
+        st.session_state.live_api_auto_refresh_enabled = True
+    if "live_api_refresh_interval_label" not in st.session_state:
+        st.session_state.live_api_refresh_interval_label = "3 seconds"
+    if "live_api_tick" not in st.session_state:
+        st.session_state.live_api_tick = 0
+    if "live_api_last_refresh_epoch" not in st.session_state:
+        st.session_state.live_api_last_refresh_epoch = time.time()
+    if "previous_live_api_mode" not in st.session_state:
+        st.session_state.previous_live_api_mode = st.session_state.live_api_mode
 
 
 def clear_workflow_state() -> None:
@@ -135,6 +153,8 @@ def reset_demo_state() -> None:
     st.session_state.live_player_metrics = None
     st.session_state.player_tick = 0
     st.session_state.player_last_refresh_epoch = time.time()
+    st.session_state.live_api_tick = 0
+    st.session_state.live_api_last_refresh_epoch = time.time()
     clear_workflow_state()
 
 def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, Any]]:
@@ -181,6 +201,10 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
             ],
             "player_scenario": st.session_state.player_scenario,
             "player_auto_run_enabled": st.session_state.player_auto_run_enabled,
+            "live_api_mode": st.session_state.live_api_mode,
+            "live_api_session_id": st.session_state.live_api_session_id,
+            "live_api_auto_refresh_enabled": st.session_state.live_api_auto_refresh_enabled,
+            "live_api_refresh_interval_label": st.session_state.live_api_refresh_interval_label,
         }
 
         if st.session_state.telemetry_source_mode == "Manual":
@@ -199,19 +223,86 @@ def render_sidebar_telemetry_inputs() -> tuple[str, dict[str, Any], dict[str, An
                     st.rerun()
 
         if st.session_state.telemetry_source_mode == "Live API fetch":
-            live_endpoint = st.text_input(
-                "Telemetry API URL",
-                value=st.session_state.get("live_endpoint", ""),
-                help="Endpoint should return JSON with the same telemetry keys used by FlowWatch.",
+            st.markdown("### Live API Mode")
+            st.session_state.live_api_mode = st.radio(
+                "Live API Mode",
+                ["Built-in demo feed", "External API URL"],
+                index=["Built-in demo feed", "External API URL"].index(
+                    st.session_state.live_api_mode
+                ),
+                label_visibility="collapsed",
             )
-            st.session_state.live_endpoint = live_endpoint
-            if st.button("Load live telemetry", use_container_width=True):
-                telemetry_data, error = load_live_telemetry(live_endpoint)
-                if error:
-                    st.error(error)
-                elif telemetry_data is not None:
-                    st.session_state.telemetry_values = telemetry_data
-                    st.success("Live telemetry loaded into the dashboard.")
+            if st.session_state.previous_live_api_mode != st.session_state.live_api_mode:
+                st.session_state.previous_live_api_mode = st.session_state.live_api_mode
+                clear_workflow_state()
+                st.rerun()
+            st.session_state.live_api_session_id = st.text_input(
+                "Session ID",
+                value=st.session_state.live_api_session_id,
+            )
+            st.session_state.live_api_auto_refresh_enabled = st.toggle(
+                "Auto-refresh live API",
+                value=st.session_state.live_api_auto_refresh_enabled,
+            )
+            st.session_state.live_api_refresh_interval_label = st.selectbox(
+                "Refresh interval",
+                ["2 seconds", "3 seconds", "5 seconds"],
+                index=["2 seconds", "3 seconds", "5 seconds"].index(
+                    st.session_state.live_api_refresh_interval_label
+                ),
+            )
+            if st.button("Refresh live API telemetry", use_container_width=True):
+                st.session_state.live_api_tick += 1
+                st.session_state.live_api_last_refresh_epoch = time.time()
+                if st.session_state.live_api_mode == "Built-in demo feed":
+                    st.session_state.telemetry_values = generate_demo_live_api_telemetry(
+                        st.session_state.live_api_tick,
+                        st.session_state.live_api_session_id,
+                    )
+                st.rerun()
+
+            if st.session_state.live_api_mode == "Built-in demo feed":
+                st.caption(
+                    f"Demo endpoint: {DEMO_LIVE_API_ENDPOINT_PREFIX}{st.session_state.live_api_session_id}"
+                )
+                st.caption(
+                    "Built-in demo feed simulates an external telemetry API for hackathon demo reliability."
+                )
+                st.session_state.telemetry_values = generate_demo_live_api_telemetry(
+                    st.session_state.live_api_tick,
+                    st.session_state.live_api_session_id,
+                )
+            else:
+                default_live_endpoint = st.session_state.get(
+                    "live_endpoint",
+                    get_secret("TELEMETRY_API_URL", ""),
+                )
+                live_endpoint = st.text_input(
+                    "Telemetry API URL",
+                    value=default_live_endpoint,
+                    help="Endpoint should return JSON with the same telemetry keys used by FlowWatch.",
+                )
+                st.session_state.live_endpoint = live_endpoint
+                if st.button("Load live telemetry", use_container_width=True):
+                    telemetry_data, error = load_live_telemetry(live_endpoint)
+                    if error:
+                        st.error(error)
+                    elif telemetry_data is not None:
+                        clear_workflow_state()
+                        st.session_state.telemetry_values = telemetry_data
+
+            source_config = {
+                **source_config,
+                "live_api_mode": st.session_state.live_api_mode,
+                "live_api_session_id": st.session_state.live_api_session_id,
+                "live_api_auto_refresh_enabled": st.session_state.live_api_auto_refresh_enabled,
+                "live_api_refresh_interval_label": st.session_state.live_api_refresh_interval_label,
+                "live_api_refresh_interval_ms": {
+                    "2 seconds": 2000,
+                    "3 seconds": 3000,
+                    "5 seconds": 5000,
+                }[st.session_state.live_api_refresh_interval_label],
+            }
 
         if st.session_state.telemetry_source_mode == "Embedded HLS player":
             st.markdown("### Player Mode")
@@ -800,6 +891,23 @@ def main() -> None:
     initialize_session_state()
 
     if (
+        st.session_state.telemetry_source_mode == "Live API fetch"
+        and st.session_state.live_api_mode == "Built-in demo feed"
+        and st.session_state.live_api_auto_refresh_enabled
+        and not st.session_state.agent_workflow_running
+        and st_autorefresh is not None
+    ):
+        st.session_state.live_api_tick = st_autorefresh(
+            interval={
+                "2 seconds": 2000,
+                "3 seconds": 3000,
+                "5 seconds": 5000,
+            }[st.session_state.live_api_refresh_interval_label],
+            key="live_api_demo_refresh",
+        )
+        st.session_state.live_api_last_refresh_epoch = time.time()
+
+    if (
         st.session_state.telemetry_source_mode == "Embedded HLS player"
         and st.session_state.player_refresh_enabled
         and st.session_state.player_scenario != "Live"
@@ -821,6 +929,14 @@ def main() -> None:
     selected_model, telemetry, source_config = render_sidebar_telemetry_inputs()
     telemetry["source_mode"] = source_config["mode"]
     live_metrics_status = None
+    if (
+        source_config["mode"] == "Live API fetch"
+        and source_config.get("live_api_mode") == "Built-in demo feed"
+        and st_autorefresh is None
+        and source_config.get("live_api_auto_refresh_enabled")
+    ):
+        st.info("Auto-refresh dependency is unavailable. Use Refresh live API telemetry.")
+
     if (
         source_config["mode"] == "Embedded HLS player"
         and source_config["player_scenario"] == "Live"
@@ -958,6 +1074,18 @@ def main() -> None:
         commander_decision=commander_decision,
         source_config=source_config,
     )
+    if (
+        source_config["mode"] == "Live API fetch"
+        and source_config.get("live_api_mode") == "Built-in demo feed"
+    ):
+        seconds_since_refresh = max(
+            0, int(time.time() - st.session_state.live_api_last_refresh_epoch)
+        )
+        st.caption(
+            "Built-in demo feed active | "
+            f"Demo endpoint: {DEMO_LIVE_API_ENDPOINT_PREFIX}{source_config.get('live_api_session_id', 'flowwatch-session')} | "
+            f"Last refresh: {seconds_since_refresh}s ago"
+        )
 
     default_agent_states = {
         "QoE Monitoring Agent": "waiting",

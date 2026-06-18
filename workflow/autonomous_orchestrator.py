@@ -3,6 +3,19 @@ from __future__ import annotations
 from typing import Any
 
 
+def _count_severe_signals(telemetry: dict[str, Any]) -> int:
+    severe_signals = 0
+    if float(telemetry.get("buffering_ratio", 0) or 0) >= 5:
+        severe_signals += 1
+    if int(telemetry.get("latency_ms", 0) or 0) >= 150:
+        severe_signals += 1
+    if float(telemetry.get("packet_loss", 0) or 0) >= 2:
+        severe_signals += 1
+    if int(telemetry.get("app_crashes", 0) or 0) > 0:
+        severe_signals += 1
+    return severe_signals
+
+
 def is_self_healing_eligible(
     *,
     source_config: dict[str, Any],
@@ -22,6 +35,12 @@ def is_self_healing_eligible(
     mode = source_config.get("mode")
     if mode == "Manual":
         return qoe_preview.get("qoe_status") == "Poor"
+
+    if mode == "Live API fetch":
+        return (
+            qoe_preview.get("qoe_status") == "Poor"
+            and _count_severe_signals(telemetry) >= 2
+        )
 
     if mode == "Embedded HLS player":
         impact_confirmed = (

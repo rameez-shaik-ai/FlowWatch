@@ -8,6 +8,7 @@ FlowWatch is a hackathon-ready Streamlit prototype for proactive telecom TV stre
 - KPN/telecom-inspired UI theme
 - Manual telemetry input
 - Live API telemetry fetch
+- Built-in demo Live API feed
 - Embedded HLS player telemetry mode
 - Random telemetry generation
 - Ideal telemetry generation
@@ -82,7 +83,7 @@ FlowWatch/
 - `services/playback_impact_gate.py`
   Evaluates whether degraded QoE has become visible playback impact before agents are triggered.
 - `services/telemetry_service.py`
-  Loads and validates telemetry from live endpoints.
+  Loads and validates telemetry from live endpoints and powers the built-in demo live API feed.
 - `agents/`
   Contains the four specialist agent implementations.
 - `ui/styles.py`
@@ -178,6 +179,26 @@ BAND_REST_URL = "https://app.band.ai"
 ```
 
 Streamlit Cloud redeploys automatically when a new commit reaches the selected branch.
+
+## Built-in Demo Live API Feed
+
+FlowWatch includes a built-in dynamic telemetry feed for demo reliability. It appears as:
+
+```text
+flowwatch://demo/live-api/flowwatch-session
+```
+
+The built-in feed simulates a realistic telemetry cycle:
+
+- Healthy
+- Warning
+- Poor
+- Recovering
+
+This lets `Live API fetch` mode work in Streamlit Cloud without requiring localhost or a separate public mock server. External API URL mode remains available for real integrations.
+
+Tip:
+- Do not use `localhost` for deployed Streamlit Cloud unless the API is also deployed publicly.
 
 ## Embedded HLS Player Mode
 
